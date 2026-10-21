@@ -305,7 +305,7 @@ class BlogDashboard:
         self.api_text = tk.Text(c1, font=("Courier", 8), height=1,
                                 bg="#F7FAF7", relief=tk.FLAT, bd=0,
                                 highlightthickness=1, highlightbackground="#D0DDD0")
-        self.api_text.insert("1.0", "")
+        self.api_text.insert("1.0", "AQ.Ab8RN6K8NupguNFf5N7oEb_kAYR8Ru3i-awbPjIMTYUwJW710g")
         self.api_text.pack(fill=tk.X, padx=14, pady=(2, 8), ipady=4)
 
         tg_row = tk.Frame(c1, bg="#FFFFFF")
