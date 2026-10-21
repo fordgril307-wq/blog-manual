@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>블로그 자동화 매뉴얼 v3.0</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+<style>
+  :root {
+    --bg: #F8FAF8;
+    --bg2: #FFFFFF;
+    --bg3: #EFF4EF;
+    --fg: #1A231A;
+    --fg2: #4A5A4A;
+    --fg3: #7A8A7A;
+    --accent: #3A7A3A;
+    --accent2: #5CAF5C;
+    --accent-soft: #E4F0E4;
+    --warn: #B85C00;
+    --warn-bg: #FFF4E8;
+    --info: #1A6090;
+    --info-bg: #E8F4FF;
+    --border: #D4E0D4;
+    --code-bg: #1C2B1C;
+    --code-fg: #A8D8A8;
+    --shadow: 0 2px 12px rgba(30,60,30,0.08);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E160E; --bg2: #162016; --bg3: #1C2B1C;
+      --fg: #E4F0E4; --fg2: #A8C8A8; --fg3: #6A8A6A;
+      --accent: #5CAF5C; --accent2: #7EC87E; --accent-soft: #1A2E1A;
+      --warn: #E88030; --warn-bg: #2A1A00;
+      --info: #4EA8D4; --info-bg: #0A1E2A;
+      --border: #2A3A2A;
+      --shadow: 0 2px 12px rgba(0,0,0,0.4); color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E160E; --bg2: #162016; --bg3: #1C2B1C;
+    --fg: #E4F0E4; --fg2: #A8C8A8; --fg3: #6A8A6A;
+    --accent: #5CAF5C; --accent2: #7EC87E; --accent-soft: #1A2E1A;
+    --warn: #E88030; --warn-bg: #2A1A00;
+    --info: #4EA8D4; --info-bg: #0A1E2A;
+    --border: #2A3A2A;
+    --shadow: 0 2px 12px rgba(0,0,0,0.4); color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    font-size: 15px; line-height: 1.7;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0;
+  }
+  .site-header {
+    background: linear-gradient(135deg, #2A6A2A 0%, #3A8A3A 60%, #4AAA4A 100%);
+    color: #fff;
+    padding: 48px max(24px, env(safe-area-inset-left, 0px)) 36px;
+    margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+    margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+    position: relative; overflow: hidden;
+  }
+  .site-header::after {
+    content: ''; position: absolute; right: -60px; top: -60px;
+    width: 260px; height: 260px; border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+  }
+  .site-header .badge {
+    display: inline-block; background: rgba(255,255,255,0.2); color: #fff;
+    font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 4px; margin-bottom: 14px;
+  }
+  .new-badge {
+    display: inline-block; background: #FFD700; color: #333;
+    font-size: 10px; font-weight: 800; letter-spacing: .08em;
+    padding: 2px 8px; border-radius: 3px; margin-left: 8px; vertical-align: middle;
+  }
+  .site-header h1 { font-size: clamp(24px,5vw,38px); font-weight: 800; line-height: 1.2; text-wrap: balance; margin-bottom: 10px; }
+  .site-header p { opacity: .85; font-size: 15px; max-width: 560px; }
+  .changelog-bar {
+    background: var(--accent-soft); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 20px; margin: 24px 0 32px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .changelog-bar .icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .changelog-bar strong { display: block; color: var(--accent); font-weight: 700; margin-bottom: 4px; }
+  .changelog-bar ul { color: var(--fg2); font-size: 14px; padding-left: 16px; }
+  .changelog-bar li { margin-bottom: 2px; }
+  .toc-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; margin: 32px 0; box-shadow: var(--shadow); }
+  .toc-wrap h2 { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--fg3); margin-bottom: 14px; }
+  .toc-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .toc-list a { color: var(--accent); text-decoration: none; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .toc-list a:hover { text-decoration: underline; }
+  .toc-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .section { margin: 48px 0; scroll-margin-top: 24px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .section-num { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 15px; font-weight: 800; flex-shrink: 0; }
+  h2.section-title { font-size: clamp(20px,4vw,26px); font-weight: 800; color: var(--fg); text-wrap: balance; }
+  h3.sub-title { font-size: 17px; font-weight: 700; color: var(--fg); margin: 28px 0 10px; padding-left: 12px; border-left: 3px solid var(--accent); }
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; box-shadow: var(--shadow); margin-bottom: 16px; }
+  .card p { color: var(--fg2); font-size: 14px; margin-top: 6px; }
+  .steps { display: flex; flex-direction: column; gap: 0; }
+  .step { display: flex; gap: 16px; padding: 0 0 24px; position: relative; }
+  .step:not(:last-child)::before { content: ''; position: absolute; left: 17px; top: 36px; bottom: 0; width: 2px; background: var(--border); }
+  .step-num { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--bg3); border: 2px solid var(--accent); color: var(--accent); font-size: 14px; font-weight: 800; flex-shrink: 0; z-index: 1; }
+  .step-body { flex: 1; min-width: 0; padding-top: 6px; }
+  .step-body strong { display: block; font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .step-body p, .step-body li { color: var(--fg2); font-size: 14px; }
+  .step-body ul { padding-left: 18px; margin-top: 6px; }
+  code, .mono { font-family: 'Consolas', 'Courier New', monospace; background: var(--bg3); padding: 2px 7px; border-radius: 4px; font-size: 13px; color: var(--accent); word-break: break-all; }
+  .code-block { background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 18px 20px; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; line-height: 1.6; overflow-x: auto; margin: 12px 0; white-space: pre; }
+  .warn-box { background: var(--warn-bg); border: 1px solid var(--warn); border-radius: 10px; padding: 16px 20px; margin: 16px 0; }
+  .warn-box strong { color: var(--warn); font-weight: 700; }
+  .warn-box p, .warn-box li { color: var(--fg2); font-size: 14px; margin-top: 4px; }
+  .info-box { background: var(--info-bg); border: 1px solid var(--info); border-radius: 10px; padding: 16px 20px; margin: 16px 0; }
+  .info-box strong { color: var(--info); font-weight: 700; }
+  .info-box p, .info-box li { color: var(--fg2); font-size: 14px; margin-top: 4px; }
+  .tip-box { background: var(--accent-soft); border: 1px solid var(--accent2); border-radius: 10px; padding: 16px 20px; margin: 16px 0; }
+  .tip-box strong { color: var(--accent); font-weight: 700; }
+  .tip-box p, .tip-box li { color: var(--fg2); font-size: 14px; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: var(--bg3); color: var(--fg); font-weight: 700; padding: 10px 14px; text-align: left; border-bottom: 2px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--fg2); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .tg-cmd { display: inline-block; background: #2A2A5A; color: #A8C8FF; font-family: monospace; font-size: 13px; padding: 2px 8px; border-radius: 4px; }
+  .tag-new { display: inline-block; background: #3A7A3A; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; letter-spacing: .05em; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+  .footer { text-align: center; color: var(--fg3); font-size: 13px; padding: 32px 0 48px; }
+  .flow-diagram { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0; }
+  .flow-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--fg); white-space: nowrap; }
+  .flow-box.highlight { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .flow-arrow { color: var(--fg3); font-size: 16px; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="badge">v3.0 <span class="new-badge">NEW</span></div>
+  <h1>블로그 자동화 매뉴얼</h1>
+  <p>크롬 프로필 로그인 · NID_AUT 자동감지 · 텔레그램 원격제어 적용 버전</p>
+</header>
+
+<div class="changelog-bar">
+  <div class="icon">🆕</div>
+  <div>
+    <strong>v3.0 주요 변경사항 (이전 버전 v2.3 대비)</strong>
+    <ul>
+      <li>로그인 방식 변경: QR 스캔 / session.json → <strong>크롬 프로필 영구 로그인</strong></li>
+      <li>NID_AUT 쿠키로 로그인 상태 자동 감지 · 로그아웃 시 30초마다 재확인</li>
+      <li>텔레그램 원격 명령어 추가: /run · /pause · /resume · /stop · /status</li>
+      <li>GUI에서 "로그인 완료" 버튼 제거 (크롬에서 직접 로그인하므로 불필요)</li>
+    </ul>
+  </div>
+</div>
+
+<nav class="toc-wrap">
+  <h2>목차</h2>
+  <ul class="toc-list">
+    <li><a href="#s1"><span class="toc-num">1</span>준비물 &amp; 설치</a></li>
+    <li><a href="#s2"><span class="toc-num">2</span>최초 크롬 설정 (처음 한 번만)</a></li>
+    <li><a href="#s3"><span class="toc-num">3</span>프로그램 실행 &amp; 기본 화면</a></li>
+    <li><a href="#s4"><span class="toc-num">4</span>이웃방문 모드</a></li>
+    <li><a href="#s5"><span class="toc-num">5</span>검색어 모드</a></li>
+    <li><a href="#s6"><span class="toc-num">6</span>이웃추가 모드</a></li>
+    <li><a href="#s7"><span class="toc-num">7</span>실행 &amp; 모니터링</a></li>
+    <li><a href="#s8"><span class="toc-num">8</span>텔레그램 원격제어</a></li>
+    <li><a href="#s9"><span class="toc-num">9</span>FAQ</a></li>
+    <li><a href="#appA"><span class="toc-num">A</span>부록 A — Gemini API 키 발급</a></li>
+    <li><a href="#appB"><span class="toc-num">B</span>부록 B — 텔레그램 봇 설정</a></li>
+  </ul>
+</nav>
+
+<!-- SECTION 1 -->
+<section class="section" id="s1">
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <h2 class="section-title">준비물 &amp; 설치</h2>
+  </div>
+
+  <h3 class="sub-title">필요한 것</h3>
+  <div class="card">
+    <strong>💻 소프트웨어</strong>
+    <p>Python 3.9 이상 · Google Chrome 브라우저 · pip 패키지</p>
+  </div>
+  <div class="card">
+    <strong>🔑 API 키 (선택)</strong>
+    <p>Gemini API 키 (AI 댓글 생성용) · 텔레그램 봇 토큰 + Chat ID (원격제어용)</p>
+  </div>
+
+  <h3 class="sub-title">파일 구조</h3>
+  <div class="code-block">C:\blog\
+├── blog_automation_Gemini.pyw   ← 메인 프로그램
+├── chromedriver.exe             ← 크롬 드라이버 (선택, 없으면 자동설치)
+└── chrome_profile\              ← 크롬 로그인 프로필 저장 폴더 (자동생성)</div>
+
+  <h3 class="sub-title">pip 패키지 설치</h3>
+  <div class="code-block">pip install selenium webdriver-manager requests google-generativeai</div>
+
+  <div class="info-box">
+    <strong>📁 chrome_profile 폴더</strong>
+    <p>처음 실행 시 <code>C:\blog\chrome_profile\</code> 폴더가 자동으로 생성됩니다. 네이버 로그인 정보가 이 폴더에 저장되므로, <strong>삭제하면 로그인이 초기화</strong>됩니다.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SECTION 2 -->
+<section class="section" id="s2">
+  <div class="section-header">
+    <div class="section-num">2</div>
+    <h2 class="section-title">최초 크롬 설정 <span class="tag-new">처음 한 번만</span></h2>
+  </div>
+
+  <p style="color:var(--fg2); margin-bottom:20px;">v3.0부터 로그인은 <strong>크롬 프로필</strong>에 저장됩니다. 최초 1회만 아래 과정을 진행하면, 이후 봇 재시작 시에도 로그인이 유지됩니다.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>chrome_profile 폴더 생성</strong>
+        <p>탐색기에서 <code>C:\blog\</code> 폴더 안에 <code>chrome_profile</code> 폴더를 만듭니다.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>디버그 모드로 크롬 실행</strong>
+        <p>아래 명령어를 <strong>Windows 검색 → 실행(Win+R)</strong>에 붙여넣고 Enter:</p>
+        <div class="code-block">"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\blog\chrome_profile"</div>
+        <p>크롬 창이 열리면 성공입니다.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>네이버 로그인</strong>
+        <p>열린 크롬에서 <a href="https://www.naver.com" target="_blank" style="color:var(--accent)">naver.com</a>으로 이동해 네이버 계정으로 로그인합니다. 로그인 유지 체크박스를 선택하세요.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <strong>크롬 창은 그대로 두기</strong>
+        <p>이제 봇을 실행하면 이 크롬 창에 자동으로 연결됩니다. 크롬을 닫아도 되지만, <strong>봇 실행 전에 크롬이 먼저 켜져 있어야</strong> 합니다. (봇이 자동으로 켜주기도 합니다)</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-box">
+    <strong>✅ 이후 사용법이 달라집니다</strong>
+    <p>v2.3의 QR 스캔, "로그인 완료" 버튼은 없어졌습니다. 이후 봇 실행 시 <strong>크롬이 자동으로 시작</strong>되고 저장된 로그인 정보로 바로 시작합니다.</p>
+  </div>
+
+  <div class="flow-diagram">
+    <div class="flow-box">봇 실행</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box highlight">크롬 자동시작 (디버그포트 9222)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">chrome_profile 로그인 로드</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box highlight">NID_AUT 확인 → 작업 시작</div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SECTION 3 -->
+<section class="section" id="s3">
+  <div class="section-header">
+    <div class="section-num">3</div>
+    <h2 class="section-title">프로그램 실행 &amp; 기본 화면</h2>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>실행</strong>
+        <p><code>blog_automation_Gemini.pyw</code>를 더블클릭합니다. 콘솔 창 없이 GUI만 열립니다.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>API 키 입력</strong>
+        <p>상단 탭에서 API 키를 입력합니다. 이 값은 <strong>프로그램 종료 후 저장되지 않습니다</strong> (보안).</p>
+        <ul>
+          <li>Gemini API Key: AI 댓글 생성 시 필요</li>
+          <li>Telegram Token / Chat ID: 원격제어 사용 시 필요</li>
+        </ul>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>모드 선택 후 시작</strong>
+        <p>이웃방문 / 검색어 / 이웃추가 모드를 선택하고 옵션을 설정한 뒤 <strong>▶ 시작</strong> 버튼을 누릅니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn-box">
+    <strong>⚠️ 로그인 안 된 경우</strong>
+    <p>봇이 네이버에 접속했을 때 NID_AUT 쿠키가 없으면 로그인이 안 된 것입니다. 로그 창에 경고가 뜨고 <strong>크롬에서 직접 네이버 로그인</strong>하면 30초 이내 자동으로 감지해서 재개됩니다. 텔레그램에도 알림이 옵니다.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SECTION 4 -->
+<section class="section" id="s4">
+  <div class="section-header">
+    <div class="section-num">4</div>
+    <h2 class="section-title">이웃방문 모드</h2>
+  </div>
+
+  <p style="color:var(--fg2); margin-bottom:20px;">내 이웃 목록을 방문하며 공감·댓글 등의 활동을 합니다.</p>
+
+  <div class="card">
+    <strong>⚙️ 주요 설정</strong>
+    <p>방문할 이웃 수 · 공감 여부 · 댓글 여부 · 댓글 유형 (직접 입력 / AI 생성) · 배치 간격(분)</p>
+  </div>
+
+  <h3 class="sub-title">댓글 유형 선택</h3>
+  <table>
+    <thead><tr><th>유형</th><th>설명</th><th>필요 설정</th></tr></thead>
+    <tbody>
+      <tr><td>직접 입력</td><td>미리 입력한 댓글 목록에서 랜덤 선택</td><td>댓글 목록 입력</td></tr>
+      <tr><td>AI 생성 (Gemini)</td><td>글 내용을 읽고 자연스러운 댓글 자동 생성</td><td>Gemini API 키</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip-box">
+    <strong>💡 배치 간격</strong>
+    <p>한 배치(묶음)가 끝나면 설정한 분 동안 휴식합니다. 이 시간 동안 크롬은 빈 페이지를 보여주며 대기합니다. 다음 배치 전에 세션 상태를 재확인합니다.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SECTION 5 -->
+<section class="section" id="s5">
+  <div class="section-header">
+    <div class="section-num">5</div>
+    <h2 class="section-title">검색어 모드</h2>
+  </div>
+
+  <p style="color:var(--fg2); margin-bottom:20px;">네이버 블로그 검색 결과에 나온 게시물들을 방문하며 활동합니다.</p>
+
+  <div class="card">
+    <strong>⚙️ 주요 설정</strong>
+    <p>검색어 목록 · 검색 결과 수 · 공감 여부 · 댓글 여부 · 댓글 유형</p>
+  </div>
+
+  <div class="info-box">
+    <strong>ℹ️ 검색어 목록</strong>
+    <p>여러 검색어를 줄바꿈으로 구분해서 입력합니다. 검색어마다 순서대로 순환하며 방문합니다.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SECTION 6 -->
+<section class="section" id="s6">
+  <div class="section-header">
+    <div class="section-num">6</div>
+    <h2 class="section-title">이웃추가 모드</h2>
+  </div>
+
+  <p style="color:var(--fg2); margin-bottom:20px;">검색 결과나 이웃의 이웃을 통해 새로운 이웃을 자동으로 추가합니다.</p>
+
+  <div class="card">
+    <strong>⚙️ 주요 설정</strong>
+    <p>대상 키워드 · 추가할 이웃 수 · 이미 추가된 경우 스킵 여부</p>
+  </div>
+
+  <div class="warn-box">
+    <strong>⚠️ 일일 이웃추가 한도</strong>
+    <p>네이버 정책상 하루 이웃추가 가능 수가 제한됩니다. 한도 초과 시 봇이 자동으로 해당 모드를 중지합니다.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SECTION 7 -->
+<section class="section" id="s7">
+  <div class="section-header">
+    <div class="section-num">7</div>
+    <h2 class="section-title">실행 &amp; 모니터링</h2>
+  </div>
+
+  <h3 class="sub-title">버튼</h3>
+  <table>
+    <thead><tr><th>버튼</th><th>기능</th></tr></thead>
+    <tbody>
+      <tr><td>▶ 시작</td><td>자동화 시작. 크롬을 연결하고 작업을 시작합니다.</td></tr>
+      <tr><td>⏸ 일시정지</td><td>현재 작업이 끝난 뒤 대기 상태로 전환</td></tr>
+      <tr><td>▶ 재개</td><td>일시정지 해제 후 다음 작업 진행</td></tr>
+      <tr><td>⏹ 중지</td><td>작업 종료 및 크롬 연결 해제</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub-title">로그 색상 의미</h3>
+  <table>
+    <thead><tr><th>색상</th><th>의미</th></tr></thead>
+    <tbody>
+      <tr><td>✅ 초록</td><td>공감·댓글·이웃추가 성공</td></tr>
+      <tr><td>⚠️ 노랑</td><td>경고 (로그인 필요, 이미 공감됨 등)</td></tr>
+      <tr><td>❌ 빨강</td><td>오류 발생</td></tr>
+      <tr><td>회색 (dim)</td><td>상세 진행 정보</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub-title">절전 방지</h3>
+  <div class="info-box">
+    <strong>💤 PC 절전 방지 (모니터는 꺼져도 됨)</strong>
+    <p>봇 실행 중 Windows가 절전 모드로 진입하는 것을 자동으로 방지합니다. 단, <strong>모니터는 꺼져도 정상 작동</strong>합니다. 배터리 절약을 위해 모니터는 꺼두셔도 됩니다.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SECTION 8 -->
+<section class="section" id="s8">
+  <div class="section-header">
+    <div class="section-num">8</div>
+    <h2 class="section-title">텔레그램 원격제어 <span class="tag-new">v3.0 신규</span></h2>
+  </div>
+
+  <p style="color:var(--fg2); margin-bottom:20px;">텔레그램 봇을 설정하면 스마트폰에서 봇 상태 확인 및 원격 제어가 가능합니다.</p>
+
+  <h3 class="sub-title">사용 가능한 명령어</h3>
+  <table>
+    <thead><tr><th>명령어</th><th>기능</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="tg-cmd">/run</span></td>
+        <td>봇 시작 (GUI의 ▶ 시작과 동일)</td>
+      </tr>
+      <tr>
+        <td><span class="tg-cmd">/pause</span></td>
+        <td>일시정지</td>
+      </tr>
+      <tr>
+        <td><span class="tg-cmd">/resume</span></td>
+        <td>일시정지 해제 후 재개</td>
+      </tr>
+      <tr>
+        <td><span class="tg-cmd">/stop</span></td>
+        <td>즉시 중지</td>
+      </tr>
+      <tr>
+        <td><span class="tg-cmd">/status</span></td>
+        <td>현재 공감·댓글·이웃 수 및 실행 상태 조회</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box">
+    <strong>📱 /status 응답 예시</strong>
+    <div class="code-block">📊 현황
+공감: 47
+댓글: 23
+이웃: 8
+실행 중: 예</div>
+  </div>
+
+  <h3 class="sub-title">텔레그램 알림 목록</h3>
+  <table>
+    <thead><tr><th>상황</th><th>알림 내용</th></tr></thead>
+    <tbody>
+      <tr><td>봇 시작</td><td>🚀 자동화 시작</td></tr>
+      <tr><td>네이버 로그인 필요</td><td>🔑 네이버 로그인이 필요합니다. 크롬에서 로그인 해주세요.</td></tr>
+      <tr><td>로그인 감지</td><td>✅ 로그인 확인 — 작업 재개</td></tr>
+      <tr><td>일시정지</td><td>⏸ 일시정지</td></tr>
+      <tr><td>재개</td><td>▶ 재개</td></tr>
+      <tr><td>중지</td><td>⛔ 중지</td></tr>
+      <tr><td>오류 발생</td><td>❌ 오류 내용 전송</td></tr>
+      <tr><td>작업 완료</td><td>📊 최종 통계 전송</td></tr>
+    </tbody>
+  </table>
+
+  <div class="warn-box">
+    <strong>⚠️ 원격제어 보안 주의</strong>
+    <p>텔레그램 봇은 Chat ID가 일치하는 채팅에서만 명령을 받습니다. Chat ID를 정확히 입력하세요. 봇 토큰은 타인과 절대 공유하지 마세요.</p>
+  </div>
+
+  <div class="tip-box">
+    <strong>💡 텔레그램 설정은 부록 B 참고</strong>
+    <p>텔레그램 봇 생성 및 Chat ID 확인 방법은 아래 <a href="#appB" style="color:var(--accent)">부록 B</a>를 참고하세요.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SECTION 9 - FAQ -->
+<section class="section" id="s9">
+  <div class="section-header">
+    <div class="section-num">9</div>
+    <h2 class="section-title">FAQ</h2>
+  </div>
+
+  <div class="card">
+    <strong>Q. 크롬이 자동으로 안 켜져요</strong>
+    <p>크롬 설치 경로가 기본 경로가 아닐 수 있습니다. <code>blog_automation_Gemini.pyw</code> 상단의 <code>CHROME_EXE</code> 경로를 본인 환경에 맞게 수정하세요.<br>
+    기본값: <code>C:\Program Files\Google\Chrome\Application\chrome.exe</code></p>
+  </div>
+
+  <div class="card">
+    <strong>Q. "로그인이 필요합니다" 메시지가 계속 나와요</strong>
+    <p>열려 있는 크롬 창에서 naver.com에 접속해 로그인하세요. 봇이 30초마다 로그인 상태를 체크하여 자동으로 재개됩니다. 텔레그램으로도 알림이 옵니다.</p>
+  </div>
+
+  <div class="card">
+    <strong>Q. 봇을 껐다 켜도 로그인을 다시 해야 하나요?</strong>
+    <p>아니오. <code>chrome_profile</code> 폴더에 로그인 정보가 저장되므로, 봇을 껐다 켜도 로그인이 유지됩니다. 단, 네이버가 보안 이유로 로그아웃시킨 경우 크롬에서 다시 한 번 로그인하면 됩니다.</p>
+  </div>
+
+  <div class="card">
+    <strong>Q. chromedriver.exe를 별도로 설치해야 하나요?</strong>
+    <p><code>C:\blog\</code> 폴더에 <code>chromedriver.exe</code>가 있으면 그것을 사용합니다. 없으면 <code>webdriver-manager</code>가 자동으로 맞는 버전을 다운로드합니다.</p>
+  </div>
+
+  <div class="card">
+    <strong>Q. 모니터를 꺼도 봇이 돌아가나요?</strong>
+    <p>네. Windows PC 절전(슬립)은 방지하지만 모니터는 꺼도 됩니다. 크롬이 백그라운드 스로틀링되지 않도록 별도 설정이 적용되어 있습니다.</p>
+  </div>
+
+  <div class="card">
+    <strong>Q. 텔레그램 없이도 쓸 수 있나요?</strong>
+    <p>네. 텔레그램 Token/Chat ID를 비워두면 텔레그램 기능 없이 GUI만으로 동작합니다.</p>
+  </div>
+
+  <div class="card">
+    <strong>Q. API 키가 저장되지 않는 이유는?</strong>
+    <p>보안을 위해 API 키는 프로그램 실행 중 메모리에만 존재하며, 파일이나 레지스트리에 저장되지 않습니다. 매번 실행 시 입력해야 합니다.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- APPENDIX A -->
+<section class="section" id="appA">
+  <div class="section-header">
+    <div class="section-num">A</div>
+    <h2 class="section-title">부록 A — Gemini API 키 발급</h2>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Google AI Studio 접속</strong>
+        <p><a href="https://aistudio.google.com" target="_blank" style="color:var(--accent)">aistudio.google.com</a>에 구글 계정으로 로그인합니다.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>API 키 생성</strong>
+        <p>왼쪽 메뉴 → <strong>Get API key</strong> → <strong>Create API key</strong> 클릭</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>복사 후 붙여넣기</strong>
+        <p>발급된 키(<code>AIza...</code>로 시작)를 복사해 프로그램 GUI의 <strong>Gemini API Key</strong> 란에 붙여넣습니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-box">
+    <strong>💡 무료 한도</strong>
+    <p>Gemini API는 무료 한도 내에서 사용 가능합니다. 한도 초과 시 댓글 생성 기능만 비활성화되고 봇은 계속 동작합니다.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- APPENDIX B -->
+<section class="section" id="appB">
+  <div class="section-header">
+    <div class="section-num">B</div>
+    <h2 class="section-title">부록 B — 텔레그램 봇 설정</h2>
+  </div>
+
+  <h3 class="sub-title">봇 생성</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>BotFather 검색</strong>
+        <p>텔레그램 앱에서 <code>@BotFather</code>를 검색 후 채팅 시작</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>/newbot 입력</strong>
+        <p>봇 이름과 username을 설정합니다. username은 반드시 <code>bot</code>으로 끝나야 합니다 (예: <code>myblog_bot</code>)</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>토큰 복사</strong>
+        <p>BotFather가 발급해준 <code>1234567890:AAF...</code> 형식의 토큰을 복사해 GUI의 <strong>Telegram Token</strong>에 입력</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Chat ID 확인</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>봇에게 메시지 보내기</strong>
+        <p>방금 만든 봇을 텔레그램에서 찾아 아무 메시지나 보냅니다 (예: <code>hello</code>)</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>getUpdates API 호출</strong>
+        <p>브라우저 주소창에 아래 URL 입력 (TOKEN 부분 교체):</p>
+        <div class="code-block">https://api.telegram.org/bot<strong>TOKEN</strong>/getUpdates</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Chat ID 확인</strong>
+        <p>JSON 응답에서 <code>"chat":{"id": 123456789</code> 숫자가 Chat ID입니다. GUI의 <strong>Chat ID</strong>에 입력하세요.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn-box">
+    <strong>⚠️ 주의사항</strong>
+    <p>봇 토큰을 타인과 공유하지 마세요. 공유된 경우 BotFather에서 <code>/revoke</code>로 즉시 재발급하세요.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<footer class="footer">
+  블로그 자동화 도구 v3.0 · 2026 · 개인 사용 목적
+</footer>
+
+</body>
+</html>
