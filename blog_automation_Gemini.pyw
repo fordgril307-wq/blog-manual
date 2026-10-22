@@ -2011,17 +2011,24 @@ def run_neighbor_mode(driver, start, end, feed_url):
                     driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
                     rnd(0.2, 0.7)
             try:
-                # 댓글 버튼: 피드 내 각 게시물의 하단 댓글 아이콘 버튼
-                # div[3]/div[2]/button/i 패턴은 유지하되 상위 경로를 느슨하게
+                # 피드의 모든 댓글 버튼 수집 — ul 하위 div[3]/div[2]/button/i 패턴
                 comment_btns = driver.find_elements(By.XPATH,
-                    '//*[@id="root"]//div/div/div/div[3]/div[2]/button/i')
-                if comment_btns and (post_idx - 1) < len(comment_btns):
-                    comment_btns[post_idx - 1].click()
-                else:
-                    # fallback: 기존 방식
-                    driver.find_element(By.XPATH,
-                        f'//*[@id="root"]/div[2]/div/div[2]/div/ul/div[1]/div/div[{post_idx}]'
-                        f'/div/div/div/div[3]/div[2]/button/i').click()
+                    '//ul//div/div/div/div[3]/div[2]/button/i')
+                if not comment_btns:
+                    # 더 넓은 범위로 재시도
+                    comment_btns = driver.find_elements(By.XPATH,
+                        '//div[3]/div[2]/button/i')
+                clicked = False
+                if comment_btns:
+                    btn_idx = post_idx - 1
+                    if btn_idx < len(comment_btns):
+                        comment_btns[btn_idx].click()
+                        clicked = True
+                    else:
+                        glog(f"  댓글 버튼 인덱스 초과 ({btn_idx} / {len(comment_btns)})", "warn")
+                        continue
+                if not clicked:
+                    glog(f"  댓글 버튼을 찾지 못함", "error"); continue
                 rnd(2.0, 4.5)
             except Exception as e:
                 glog(f"  댓글창 열기 실패: {e}", "error"); continue
