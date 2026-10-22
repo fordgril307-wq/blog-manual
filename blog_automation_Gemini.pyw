@@ -1999,36 +1999,50 @@ def run_neighbor_mode(driver, start, end, feed_url):
         visited = set()
         session_restart = False
 
-        for post_idx in range(start, end+1):
-            wait_if_paused()
-            driver.get(feed_url)
-            rnd(2.5, 5.0)
-            glog(f"━━  {post_idx}번 게시글  ━━", "header")
-            gcurrent(f"게시글 #{post_idx}")
+        # ── 피드 로드 후 댓글 버튼 목록 수집 ──
+        wait_if_paused()
+        driver.get(feed_url)
+        rnd(2.5, 5.0)
 
-            if post_idx > 6:
-                for _ in range(post_idx - 5):
-                    driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
-                    rnd(0.2, 0.7)
+        # 스크롤로 end번째 게시글까지 로드
+        for _ in range(max(0, end - 3)):
+            driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
+            rnd(0.2, 0.6)
+
+        # 댓글 버튼 전체 수집 (줌/레이아웃 무관하게 패턴으로 찾기)
+        all_btns = driver.find_elements(By.XPATH,
+            '//ul//div/div/div/div[3]/div[2]/button')
+        if not all_btns:
+            all_btns = driver.find_elements(By.XPATH,
+                '//div[3]/div[2]/button[.//i]')
+
+        glog(f"  댓글 버튼 {len(all_btns)}개 발견", "dim")
+
+        # start~end 범위 슬라이싱 (1-based → 0-based)
+        target_btns = all_btns[start-1:end]
+
+        for btn_no, btn in enumerate(target_btns, start=start):
+            wait_if_paused()
+            glog(f"━━  {btn_no}번 게시글  ━━", "header")
+            gcurrent(f"게시글 #{btn_no}")
+
+            driver.get(feed_url)
+            rnd(2.0, 4.0)
+
+            # 버튼 재수집 (페이지 재로드 후)
+            for _ in range(max(0, btn_no - 3)):
+                driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
+                rnd(0.2, 0.6)
+
             try:
-                # 피드의 모든 댓글 버튼 수집 — ul 하위 div[3]/div[2]/button/i 패턴
-                comment_btns = driver.find_elements(By.XPATH,
-                    '//ul//div/div/div/div[3]/div[2]/button/i')
-                if not comment_btns:
-                    # 더 넓은 범위로 재시도
-                    comment_btns = driver.find_elements(By.XPATH,
-                        '//div[3]/div[2]/button/i')
-                clicked = False
-                if comment_btns:
-                    btn_idx = post_idx - 1
-                    if btn_idx < len(comment_btns):
-                        comment_btns[btn_idx].click()
-                        clicked = True
-                    else:
-                        glog(f"  댓글 버튼 인덱스 초과 ({btn_idx} / {len(comment_btns)})", "warn")
-                        continue
-                if not clicked:
-                    glog(f"  댓글 버튼을 찾지 못함", "error"); continue
+                fresh_btns = driver.find_elements(By.XPATH,
+                    '//ul//div/div/div/div[3]/div[2]/button')
+                if not fresh_btns:
+                    fresh_btns = driver.find_elements(By.XPATH,
+                        '//div[3]/div[2]/button[.//i]')
+                if not fresh_btns or (btn_no - start) >= len(fresh_btns):
+                    glog(f"  댓글 버튼 없음 — 건너뜀", "warn"); continue
+                fresh_btns[btn_no - start].click()
                 rnd(2.0, 4.5)
             except Exception as e:
                 glog(f"  댓글창 열기 실패: {e}", "error"); continue
