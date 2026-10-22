@@ -2057,7 +2057,13 @@ def run_neighbor_mode(driver, start, end, feed_url):
                         '//div[3]/div[2]/button[.//i]')
                 if not fresh_btns or (btn_no - start) >= len(fresh_btns):
                     glog(f"  댓글 버튼 없음 — 건너뜀", "warn"); continue
-                fresh_btns[btn_no - start].click()
+                btn_el = fresh_btns[btn_no - start]
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn_el)
+                rnd(0.4, 0.8)
+                try:
+                    btn_el.click()
+                except Exception:
+                    driver.execute_script("arguments[0].click();", btn_el)
                 rnd(2.0, 4.5)
             except Exception as e:
                 glog(f"  댓글창 열기 실패: {e}", "error"); continue
