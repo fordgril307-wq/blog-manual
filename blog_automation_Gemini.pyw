@@ -2050,14 +2050,23 @@ def run_neighbor_mode(driver, start, end, feed_url):
                 rnd(0.2, 0.6)
 
             try:
-                fresh_btns = driver.find_elements(By.XPATH,
-                    '//ul//div/div/div/div[3]/div[2]/button')
-                if not fresh_btns:
+                # 버튼이 충분히 로드될 때까지 추가 스크롤
+                needed_idx = btn_no - start  # 0-based index needed
+                for _extra in range(30):  # 최대 30회 추가 스크롤 시도
                     fresh_btns = driver.find_elements(By.XPATH,
-                        '//div[3]/div[2]/button[.//i]')
-                if not fresh_btns or (btn_no - start) >= len(fresh_btns):
-                    glog(f"  댓글 버튼 없음 — 건너뜀", "warn"); continue
-                btn_el = fresh_btns[btn_no - start]
+                        '//ul//div/div/div/div[3]/div[2]/button')
+                    if not fresh_btns:
+                        fresh_btns = driver.find_elements(By.XPATH,
+                            '//div[3]/div[2]/button[.//i]')
+                    if len(fresh_btns) > needed_idx:
+                        break  # 충분히 수집됨
+                    driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
+                    rnd(0.15, 0.35)
+
+                glog(f"  버튼 {len(fresh_btns)}개 수집, 필요 인덱스: {needed_idx}", "dim")
+                if not fresh_btns or needed_idx >= len(fresh_btns):
+                    glog(f"  댓글 버튼 없음 — 건너뜀 (수집:{len(fresh_btns)}, 필요:{needed_idx})", "warn"); continue
+                btn_el = fresh_btns[needed_idx]
                 driver.execute_script("arguments[0].scrollIntoView({block:'center'});", btn_el)
                 rnd(0.4, 0.8)
                 try:
