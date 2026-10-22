@@ -52,8 +52,22 @@ def _launch_chrome_if_needed():
     time.sleep(3)
     return False
 
+def _clear_wdm_lock():
+    """비정상 종료로 남은 webdriver-manager 락 파일 자동 삭제"""
+    try:
+        import glob as _glob
+        wdm_dir = os.path.join(os.path.expanduser("~"), ".wdm")
+        for lock_file in _glob.glob(os.path.join(wdm_dir, ".wdm-lock-*")):
+            try:
+                os.remove(lock_file)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
 def _connect_chrome():
     """debuggerAddress로 이미 실행 중인 Chrome에 붙기"""
+    _clear_wdm_lock()  # 락 파일 잔재 정리
     opts = webdriver.ChromeOptions()
     opts.add_experimental_option("debuggerAddress", f"127.0.0.1:{CHROME_DEBUG_PORT}")
     opts.add_argument("--disable-background-timer-throttling")
