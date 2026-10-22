@@ -1493,12 +1493,31 @@ def do_like_and_comment(driver, blog_id, content_div):
 
     # 댓글창 열기
     try:
-        driver.find_element(By.XPATH,
+        _btn_xpath = (
             f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-            f'/div[1]/div[3]/div[2]/button/i').click()
+            f'/div[1]/div[3]/div[2]/button'
+        )
+        comment_btn = None
+        # 버튼이 나타날 때까지 최대 10회 스크롤하며 대기
+        for _retry in range(10):
+            try:
+                comment_btn = driver.find_element(By.XPATH, _btn_xpath)
+                break
+            except Exception:
+                driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
+                rnd(0.2, 0.4)
+        if comment_btn is None:
+            glog(f"  [{blog_id}] 댓글창 열기 실패 (버튼 미발견)", "error")
+            return liked
+        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", comment_btn)
+        rnd(0.3, 0.6)
+        try:
+            comment_btn.click()
+        except Exception:
+            driver.execute_script("arguments[0].click();", comment_btn)
         rnd(3.5, 6.5)  # 댓글창 로딩 대기
     except Exception as e:
-        glog(f"  [{blog_id}] 댓글창 열기 실패", "error")
+        glog(f"  [{blog_id}] 댓글창 열기 실패: {e}", "error")
         return liked
 
     # 입력 & 등록
