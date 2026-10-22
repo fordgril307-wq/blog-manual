@@ -47,8 +47,7 @@ def _launch_chrome_if_needed():
         pass
     _sp2.Popen([CHROME_EXE,
                 f"--remote-debugging-port={CHROME_DEBUG_PORT}",
-                f"--user-data-dir={CHROME_PROFILE_DIR}",
-                "--force-device-scale-factor=0.25"])
+                f"--user-data-dir={CHROME_PROFILE_DIR}"])
     time.sleep(3)
     return False
 
@@ -76,8 +75,10 @@ def _connect_chrome():
     _script_dir = os.path.dirname(os.path.abspath(__file__))
     _local_driver = os.path.join(_script_dir, "chromedriver.exe")
     if os.path.isfile(_local_driver):
-        return webdriver.Chrome(service=Service(_local_driver), options=opts)
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+        drv = webdriver.Chrome(service=Service(_local_driver), options=opts)
+    else:
+        drv = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+    return drv
 
 def _is_logged_in(driver):
     """NID_AUT 쿠키로 네이버 로그인 상태 확인"""
