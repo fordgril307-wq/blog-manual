@@ -1419,10 +1419,30 @@ def get_commenters(driver):
 def do_like_and_comment(driver, blog_id, content_div):
     # 좋아요
     liked = False
+    _like_xpaths = [
+        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+         f'/div[1]/div[3]/div[1]/div/div/div/a'),
+        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+         f'/div[2]/div[3]/div[1]/div/div/div/a'),
+        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+         f'/div[1]/div[4]/div[1]/div/div/div/a'),
+        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+         f'/div[2]/div[4]/div[1]/div/div/div/a'),
+        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+         f'/div[1]/div[2]/div[1]/div/div/div/a'),
+        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+         f'/div[2]/div[2]/div[1]/div/div/div/a'),
+    ]
+    like_a = None
+    for _xp in _like_xpaths:
+        try:
+            like_a = driver.find_element(By.XPATH, _xp)
+            break
+        except Exception:
+            pass
     try:
-        like_a = driver.find_element(By.XPATH,
-            f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-            f'/div[1]/div[3]/div[1]/div/div/div/a')
+        if like_a is None:
+            raise Exception("좋아요 버튼 미발견")
         if like_a.get_attribute('aria-pressed') == 'true':
             glog(f"  [{blog_id}] 이미 좋아요 → 스킵", "dim")
             return False
