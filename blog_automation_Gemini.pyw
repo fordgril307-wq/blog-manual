@@ -1383,22 +1383,37 @@ def generate_comment(title, preview=""):
 def get_commenters(driver):
     commenters = []
     seen = set()
+
+    # 댓글 패널 로드 대기 (최대 5초)
+    panel_xp = '//*[contains(@id,"naverComment_") and contains(@id,"_wai_u_cbox_content_wrap_tabpanel")]'
+    for _ in range(10):
+        try:
+            driver.find_element(By.XPATH, panel_xp + '/ul/li[1]')
+            break
+        except:
+            rnd(0.3, 0.5)
+
+    # 댓글 수: span 텍스트 → 실패 시 li 개수 직접 세기
     try:
         count_el = driver.find_element(By.XPATH,
             '//*[@id="root"]/div[3]/div[2]/div/div/div/div[1]/div/div[1]/h2/span')
         total = int(count_el.text.strip().replace(',',''))
         glog(f"  댓글 {total}개", "dim")
     except:
-        total = 50
-    rnd(1.5, 3.0)
+        try:
+            lis = driver.find_elements(By.XPATH, panel_xp + '/ul/li')
+            total = len(lis)
+            glog(f"  댓글 {total}개 (li 직접 수집)", "dim")
+        except:
+            total = 50
+
+    rnd(1.0, 2.0)
     for li in range(1, total+1):
         try:
             a = driver.find_element(By.XPATH,
-                f'//*[contains(@id,"naverComment_") and contains(@id,"_wai_u_cbox_content_wrap_tabpanel")]'
-                f'/ul/li[{li}]/div[1]/div/div[1]/span[1]/a')
+                f'{panel_xp}/ul/li[{li}]/div[1]/div/div[1]/span[1]/a')
             ne = driver.find_element(By.XPATH,
-                f'//*[contains(@id,"naverComment_") and contains(@id,"_wai_u_cbox_content_wrap_tabpanel")]'
-                f'/ul/li[{li}]/div[1]/div/div[1]/span[1]/a/span/span/span')
+                f'{panel_xp}/ul/li[{li}]/div[1]/div/div[1]/span[1]/a/span/span/span')
             nick = ne.text.strip()
             href = a.get_attribute('href') or ''
             if nick and href and nick not in seen:
@@ -1419,20 +1434,15 @@ def get_commenters(driver):
 def do_like_and_comment(driver, blog_id, content_div):
     # 좋아요
     liked = False
-    _like_xpaths = [
-        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-         f'/div[1]/div[3]/div[1]/div/div/div/a'),
-        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-         f'/div[2]/div[3]/div[1]/div/div/div/a'),
-        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-         f'/div[1]/div[4]/div[1]/div/div/div/a'),
-        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-         f'/div[2]/div[4]/div[1]/div/div/div/a'),
-        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-         f'/div[1]/div[2]/div[1]/div/div/div/a'),
-        (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-         f'/div[2]/div[2]/div[1]/div/div/div/a'),
-    ]
+    # 좋아요 XPath: div/div[2]/ul (기본) + div[3]/div/div[2]/ul (신규 레이아웃)
+    _like_xpaths = []
+    for _mid in ['div/div[2]', 'div[3]/div/div[2]']:
+        for _d1 in ['div[1]', 'div[2]']:
+            for _d3 in ['div[3]', 'div[4]', 'div[2]']:
+                _like_xpaths.append(
+                    f'//*[@id="contentslist_block"]/div[{content_div}]/{_mid}/ul/li[1]'
+                    f'/{_d1}/{_d3}/div[1]/div/div/div/a'
+                )
     like_a = None
     for _xp in _like_xpaths:
         try:
@@ -1458,13 +1468,14 @@ def do_like_and_comment(driver, blog_id, content_div):
     # 제목/미리보기
     title_text = None; preview_text = ""
 
-    # 제목 XPath 후보 목록 (div[1]/div[2], div[2]/div[2], div[1]/div[3], div[2]/div[3] 변형 포함)
+    # 제목 XPath 후보: div/div[2]/ul + div[3]/div/div[2]/ul 레이아웃 모두 포함
     _title_xpaths = []
-    for _d1 in ['div[1]', 'div[2]']:
-        for _d2 in ['div[2]', 'div[3]']:
-            base = (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-                    f'/{_d1}/{_d2}/div[2]/a')
-            _title_xpaths += [base + '/strong/span', base + '/strong', base]
+    for _mid in ['div/div[2]', 'div[3]/div/div[2]']:
+        for _d1 in ['div[1]', 'div[2]']:
+            for _d2 in ['div[2]', 'div[3]']:
+                base = (f'//*[@id="contentslist_block"]/div[{content_div}]/{_mid}/ul/li[1]'
+                        f'/{_d1}/{_d2}/div[2]/a')
+                _title_xpaths += [base + '/strong/span', base + '/strong', base]
 
     # XPath 순서대로 제목 추출 시도
     for _txp in _title_xpaths:
@@ -1488,18 +1499,19 @@ def do_like_and_comment(driver, blog_id, content_div):
     else:
         glog(f"  [{blog_id}] 제목 추출 전부 실패 → 폴백", "warn")
 
-    # 미리보기 XPath 후보 (div[1]/div[2], div[2]/div[2], div[1]/div[3], div[2]/div[3] 변형)
-    for _d1 in ['div[1]', 'div[2]']:
-        for _d2 in ['div[2]', 'div[3]']:
-            if preview_text:
-                break
-            try:
-                _p = driver.find_element(By.XPATH,
-                    f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-                    f'/{_d1}/{_d2}/div[2]/a/span/span').text.strip()
-                if _p:
-                    preview_text = _p
-            except: pass
+    # 미리보기 XPath 후보: div/div[2]/ul + div[3]/div/div[2]/ul 레이아웃 모두 포함
+    for _mid in ['div/div[2]', 'div[3]/div/div[2]']:
+        for _d1 in ['div[1]', 'div[2]']:
+            for _d2 in ['div[2]', 'div[3]']:
+                if preview_text:
+                    break
+                try:
+                    _p = driver.find_element(By.XPATH,
+                        f'//*[@id="contentslist_block"]/div[{content_div}]/{_mid}/ul/li[1]'
+                        f'/{_d1}/{_d2}/div[2]/a/span/span').text.strip()
+                    if _p:
+                        preview_text = _p
+                except: pass
     if preview_text:
         glog(f"  미리보기: {preview_text[:40]}…", "dim")
 
@@ -1515,28 +1527,18 @@ def do_like_and_comment(driver, blog_id, content_div):
 
     # 댓글창 열기
     try:
-        # 다양한 레이아웃에 대응하는 폴백 XPath 목록
-        _btn_xpaths = [
-            # li[1]/div[1]/... — 기본 레이아웃
-            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-             f'/div[1]/div[3]/div[2]/button'),
-            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-             f'/div[1]/div[4]/div[2]/button'),
-            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-             f'/div[1]/div[2]/div[2]/button'),
-            # li[1]/div[2]/... — 일부 블로그 대안 레이아웃
-            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-             f'/div[2]/div[3]/div[2]/button'),
-            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-             f'/div[2]/div[4]/div[2]/button'),
-            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-             f'/div[2]/div[2]/div[2]/button'),
-            # content_div+1 대응 (페이지 재로드 후 div 번호 밀릴 수 있음)
-            (f'//*[@id="contentslist_block"]/div[{content_div + 1}]/div/div[2]/ul/li[1]'
-             f'/div[1]/div[3]/div[2]/button'),
-            (f'//*[@id="contentslist_block"]/div[{content_div + 1}]/div/div[2]/ul/li[1]'
-             f'/div[2]/div[3]/div[2]/button'),
-            # 포괄적 폴백: contentslist_block 안의 댓글 버튼 아무거나
+        # 댓글 버튼 XPath: div/div[2]/ul (기본) + div[3]/div/div[2]/ul (신규 레이아웃)
+        _btn_xpaths = []
+        for _cdiv in [content_div, content_div + 1]:
+            for _mid in ['div/div[2]', 'div[3]/div/div[2]']:
+                for _d1 in ['div[1]', 'div[2]']:
+                    for _d3 in ['div[3]', 'div[4]', 'div[2]']:
+                        _btn_xpaths.append(
+                            f'//*[@id="contentslist_block"]/div[{_cdiv}]/{_mid}/ul/li[1]'
+                            f'/{_d1}/{_d3}/div[2]/button'
+                        )
+        # 포괄적 폴백
+        _btn_xpaths += [
             f'//*[@id="contentslist_block"]//button[.//i[contains(@class,"u_cnt")]]',
             f'//*[@id="contentslist_block"]//div[contains(@class,"comment")]//button',
         ]
