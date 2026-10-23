@@ -1495,15 +1495,25 @@ def do_like_and_comment(driver, blog_id, content_div):
     try:
         # 다양한 레이아웃에 대응하는 폴백 XPath 목록
         _btn_xpaths = [
+            # li[1]/div[1]/... — 기본 레이아웃
             (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
              f'/div[1]/div[3]/div[2]/button'),
             (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
              f'/div[1]/div[4]/div[2]/button'),
             (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
              f'/div[1]/div[2]/div[2]/button'),
-            # content_div±1 대응 (페이지 재로드 후 div 번호 밀릴 수 있음)
+            # li[1]/div[2]/... — 일부 블로그 대안 레이아웃
+            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+             f'/div[2]/div[3]/div[2]/button'),
+            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+             f'/div[2]/div[4]/div[2]/button'),
+            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+             f'/div[2]/div[2]/div[2]/button'),
+            # content_div+1 대응 (페이지 재로드 후 div 번호 밀릴 수 있음)
             (f'//*[@id="contentslist_block"]/div[{content_div + 1}]/div/div[2]/ul/li[1]'
              f'/div[1]/div[3]/div[2]/button'),
+            (f'//*[@id="contentslist_block"]/div[{content_div + 1}]/div/div[2]/ul/li[1]'
+             f'/div[2]/div[3]/div[2]/button'),
             # 포괄적 폴백: contentslist_block 안의 댓글 버튼 아무거나
             f'//*[@id="contentslist_block"]//button[.//i[contains(@class,"u_cnt")]]',
             f'//*[@id="contentslist_block"]//div[contains(@class,"comment")]//button',
