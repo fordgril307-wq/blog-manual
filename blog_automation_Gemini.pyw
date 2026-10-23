@@ -1458,27 +1458,22 @@ def do_like_and_comment(driver, blog_id, content_div):
     # 제목/미리보기
     title_text = None; preview_text = ""
 
-    # XPath 방법 1: strong/span
-    try:
-        title_text = driver.find_element(By.XPATH,
-            f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-            f'/div[1]/div[2]/div[2]/a/strong/span').text.strip()
-    except: pass
+    # 제목 XPath 후보 목록 (div[1]/div[2], div[2]/div[2], div[1]/div[3], div[2]/div[3] 변형 포함)
+    _title_xpaths = []
+    for _d1 in ['div[1]', 'div[2]']:
+        for _d2 in ['div[2]', 'div[3]']:
+            base = (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+                    f'/{_d1}/{_d2}/div[2]/a')
+            _title_xpaths += [base + '/strong/span', base + '/strong', base]
 
-    # XPath 방법 2: strong (span 없이)
-    if not title_text:
+    # XPath 순서대로 제목 추출 시도
+    for _txp in _title_xpaths:
+        if title_text:
+            break
         try:
-            title_text = driver.find_element(By.XPATH,
-                f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-                f'/div[1]/div[2]/div[2]/a/strong').text.strip()
-        except: pass
-
-    # XPath 방법 3: 링크 텍스트 전체
-    if not title_text:
-        try:
-            title_text = driver.find_element(By.XPATH,
-                f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-                f'/div[1]/div[2]/div[2]/a').text.strip().split('\n')[0]
+            _t = driver.find_element(By.XPATH, _txp).text.strip().split('\n')[0]
+            if _t:
+                title_text = _t
         except: pass
 
     # 최후 수단: 페이지 document.title
@@ -1493,13 +1488,20 @@ def do_like_and_comment(driver, blog_id, content_div):
     else:
         glog(f"  [{blog_id}] 제목 추출 전부 실패 → 폴백", "warn")
 
-    try:
-        preview_text = driver.find_element(By.XPATH,
-            f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-            f'/div[1]/div[2]/div[2]/a/span/span').text.strip()
-        if preview_text:
-            glog(f"  미리보기: {preview_text[:40]}…", "dim")
-    except: pass
+    # 미리보기 XPath 후보 (div[1]/div[2], div[2]/div[2], div[1]/div[3], div[2]/div[3] 변형)
+    for _d1 in ['div[1]', 'div[2]']:
+        for _d2 in ['div[2]', 'div[3]']:
+            if preview_text:
+                break
+            try:
+                _p = driver.find_element(By.XPATH,
+                    f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+                    f'/{_d1}/{_d2}/div[2]/a/span/span').text.strip()
+                if _p:
+                    preview_text = _p
+            except: pass
+    if preview_text:
+        glog(f"  미리보기: {preview_text[:40]}…", "dim")
 
     # 댓글 생성
     comment_text = get_fallback_comment()
