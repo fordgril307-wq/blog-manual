@@ -1493,19 +1493,34 @@ def do_like_and_comment(driver, blog_id, content_div):
 
     # 댓글창 열기
     try:
-        _btn_xpath = (
-            f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
-            f'/div[1]/div[3]/div[2]/button'
-        )
+        # 다양한 레이아웃에 대응하는 폴백 XPath 목록
+        _btn_xpaths = [
+            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+             f'/div[1]/div[3]/div[2]/button'),
+            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+             f'/div[1]/div[4]/div[2]/button'),
+            (f'//*[@id="contentslist_block"]/div[{content_div}]/div/div[2]/ul/li[1]'
+             f'/div[1]/div[2]/div[2]/button'),
+            # content_div±1 대응 (페이지 재로드 후 div 번호 밀릴 수 있음)
+            (f'//*[@id="contentslist_block"]/div[{content_div + 1}]/div/div[2]/ul/li[1]'
+             f'/div[1]/div[3]/div[2]/button'),
+            # 포괄적 폴백: contentslist_block 안의 댓글 버튼 아무거나
+            f'//*[@id="contentslist_block"]//button[.//i[contains(@class,"u_cnt")]]',
+            f'//*[@id="contentslist_block"]//div[contains(@class,"comment")]//button',
+        ]
         comment_btn = None
-        # 버튼이 나타날 때까지 최대 10회 스크롤하며 대기
+        # 버튼이 나타날 때까지 최대 10회 스크롤하며 대기, 각 XPath 순차 시도
         for _retry in range(10):
-            try:
-                comment_btn = driver.find_element(By.XPATH, _btn_xpath)
+            for _xp in _btn_xpaths:
+                try:
+                    comment_btn = driver.find_element(By.XPATH, _xp)
+                    break
+                except Exception:
+                    pass
+            if comment_btn:
                 break
-            except Exception:
-                driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
-                rnd(0.2, 0.4)
+            driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
+            rnd(0.2, 0.4)
         if comment_btn is None:
             glog(f"  [{blog_id}] 댓글창 열기 실패 (버튼 미발견)", "error")
             return liked
