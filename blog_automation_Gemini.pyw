@@ -2083,6 +2083,16 @@ def run_neighbor_mode(driver, start, end, feed_url):
         driver.get(feed_url)
         rnd(2.5, 5.0)
 
+        # 피드 로드 시 "7일동안 안보기" 알림 팝업 처리
+        try:
+            FEED_POPUP_XPATH = "/html/body/div[2]/div[1]/div[2]/div[2]/div[2]/div[2]/div/div/div[2]/div/div[2]/div/div[2]/label"
+            feed_popup = driver.find_element(By.XPATH, FEED_POPUP_XPATH)
+            driver.execute_script("arguments[0].click();", feed_popup)
+            rnd(0.5, 1.0)
+            glog("  피드 팝업 '7일동안 안보기' 클릭", "dim")
+        except Exception:
+            pass
+
         # 스크롤로 end번째 게시글까지 로드
         for _ in range(max(0, end - 3)):
             driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
@@ -2107,6 +2117,16 @@ def run_neighbor_mode(driver, start, end, feed_url):
 
             driver.get(feed_url)
             rnd(2.0, 4.0)
+
+            # 피드 재로드 시 "7일동안 안보기" 알림 팝업 처리
+            try:
+                FEED_POPUP_XPATH = "/html/body/div[2]/div[1]/div[2]/div[2]/div[2]/div[2]/div/div/div[2]/div/div[2]/div/div[2]/label"
+                feed_popup = driver.find_element(By.XPATH, FEED_POPUP_XPATH)
+                driver.execute_script("arguments[0].click();", feed_popup)
+                rnd(0.5, 1.0)
+                glog("  피드 팝업 '7일동안 안보기' 클릭", "dim")
+            except Exception:
+                pass
 
             # 버튼 재수집 (페이지 재로드 후)
             for _ in range(max(0, btn_no - 3)):
