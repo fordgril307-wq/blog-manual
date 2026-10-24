@@ -90,6 +90,44 @@ def _is_logged_in(driver):
     except Exception:
         return False
 
+def _get_my_blog_id(driver):
+    """로그인된 네이버 계정의 본인 블로그 ID 추출 (본인 게시글 스킵용)"""
+    try:
+        driver.get("https://m.blog.naver.com/")
+        time.sleep(2)
+        # 내 블로그 링크: href="/내blogId" 또는 href="https://m.blog.naver.com/내blogId"
+        # 프로필 영역 a 태그에서 추출
+        for xp in [
+            '//a[contains(@href,"blog.naver.com") and contains(@class,"MobileMyInfo")]',
+            '//*[@id="gnb"]//*[contains(@href,"blog.naver.com")]',
+            '//a[contains(@href,"/blog.naver.com/") and not(contains(@href,"FeedList")) and not(contains(@href,"Search"))]',
+        ]:
+            try:
+                el = driver.find_element(By.XPATH, xp)
+                href = el.get_attribute('href') or ''
+                bid = href.rstrip('/').split('/')[-1].split('?')[0]
+                if bid and bid not in ('', 'blog.naver.com', 'm.blog.naver.com'):
+                    return bid
+            except: pass
+        # 대안: 네이버 메인에서 내 블로그 링크 추출
+        driver.get("https://www.naver.com")
+        time.sleep(1)
+        for xp in [
+            '//a[contains(@href,"blog.naver.com") and contains(text(),"블로그")]',
+            '//a[@class="MyView-module__link_my_menu___HaTvB" and contains(@href,"blog.naver.com")]',
+            '//*[contains(@class,"MyView")]//a[contains(@href,"blog.naver.com")]',
+        ]:
+            try:
+                el = driver.find_element(By.XPATH, xp)
+                href = el.get_attribute('href') or ''
+                bid = href.rstrip('/').split('blog.naver.com/')[-1].split('?')[0].strip('/')
+                if bid and '.' not in bid and bid not in ('', 'blog.naver.com'):
+                    return bid
+            except: pass
+    except Exception as e:
+        glog(f"  [본인 ID 추출 실패] {e}", "dim")
+    return None
+
 def _wait_for_login(driver):
     """로그인될 때까지 30초마다 NID_AUT 쿠키 확인 (정지 시 탈출)"""
     glog("  로그인 대기 중 — 크롬에서 네이버 로그인 해주세요.", "warn")
@@ -106,6 +144,7 @@ def _wait_for_login(driver):
 log_queue = queue.Queue()
 stats = {"hearts": 0, "comments": 0, "blocks": 0, "skips": 0, "neighbors": 0, "running": False}
 _neighbor_limit_reached = False  # 이웃 5000명 한도 도달 시 True → 이후 이웃추가 전부 스킵
+_my_blog_id = None  # 로그인된 본인 블로그 ID (본인 게시글 댓글 스킵용)
 
 # ── 절전 방지 (Windows) ──
 import ctypes
@@ -1443,6 +1482,12 @@ def get_commenters(driver):
             commenters.append(bid)
             glog(f"  수집: {nick} → {bid}", "dim")
         except: continue
+    # 본인 블로그 ID 필터 (내 게시글에 내가 댓글 달지 않도록)
+    if _my_blog_id:
+        before = len(commenters)
+        commenters = [b for b in commenters if b.lower() != _my_blog_id.lower()]
+        if len(commenters) < before:
+            glog(f"  [본인 스킵] {_my_blog_id} 제외됨", "dim")
     glog(f"  총 {len(commenters)}명", "info")
     return commenters
 
@@ -2094,6 +2139,15 @@ def search_and_interact(driver, keywords, visit_count, order_type):
 # 이웃 모드 메인
 # =============================================
 def run_neighbor_mode(driver, start, end, feed_url):
+    global _my_blog_id
+    # 본인 블로그 ID 확인 (아직 모르는 경우에만 추출)
+    if not _my_blog_id:
+        _my_blog_id = _get_my_blog_id(driver)
+        if _my_blog_id:
+            glog(f"  [본인 블로그 ID] {_my_blog_id} — 본인 게시글 자동 스킵", "info")
+        else:
+            glog("  [본인 블로그 ID 추출 실패] 본인 게시글 스킵 비활성", "warn")
+
     batch_size = random.randint(20, 50)
     batch_comment_start = stats["comments"]  # 댓글 기준 배치
 
