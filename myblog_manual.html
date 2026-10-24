@@ -194,56 +194,60 @@
     position: fixed;
     top: 0; left: 0; right: 0;
     z-index: 200;
-    background: var(--primary);
+    background: #1a3a1a;
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 max(12px, env(safe-area-inset-left, 0px));
-    height: 44px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    padding: 0 max(8px, env(safe-area-inset-left, 0px));
+    height: 52px;
+    box-shadow: 0 3px 12px rgba(0,0,0,.4);
     transform: translateY(-100%);
     transition: transform .25s ease;
     font-family: 'Noto Sans KR', sans-serif;
   }
   #sec-nav.visible { transform: translateY(0); }
   #sec-nav .nav-btn {
-    background: rgba(255,255,255,.18);
+    background: rgba(255,255,255,.22);
     border: none;
     color: #fff;
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 13px;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 18px;
+    font-weight: 700;
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
+    line-height: 1;
   }
-  #sec-nav .nav-btn:disabled { opacity: .35; cursor: default; }
+  #sec-nav .nav-btn:disabled { opacity: .3; cursor: default; }
   #sec-nav .nav-center {
     flex: 1;
     text-align: center;
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 700;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0 8px;
+    padding: 0 6px;
+    letter-spacing: -0.3px;
   }
 
   /* === 위로 버튼 === */
   #top-btn {
     position: fixed;
-    bottom: max(24px, env(safe-area-inset-bottom, 0px));
+    bottom: max(28px, env(safe-area-inset-bottom, 0px));
     right: max(20px, env(safe-area-inset-right, 0px));
     z-index: 200;
-    width: 44px; height: 44px;
+    width: 52px; height: 52px;
     border-radius: 50%;
-    background: var(--primary);
+    background: #1a3a1a;
     color: #fff;
     border: none;
-    font-size: 20px;
+    font-size: 24px;
+    font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 3px 10px rgba(0,0,0,.3);
+    box-shadow: 0 4px 14px rgba(0,0,0,.4);
     opacity: 0;
     pointer-events: none;
     transition: opacity .25s;
