@@ -1391,10 +1391,14 @@ def generate_comment(title, preview=""):
         result = re.sub(r'나도', '저도', result)          # 나도 → 저도
         result = re.sub(r'나는', '저는', result)          # 나는 → 저는
         # 문장 중간 반말 감탄 교체 (전체 치환)
-        result = re.sub(r'미쳤다', '미쳤네요', result)
-        result = re.sub(r'대박이다', '대박이네요', result)
-        result = re.sub(r'보인다', '보이네요', result)    # 좋아 보인다 → 좋아 보이네요
-        result = re.sub(r'같다', '같네요', result)        # ~것 같다 → ~것 같네요
+        result = re.sub(r'미쳤다(는)', r'미쳤다\1', result)   # 미쳤다는 → 그대로 (보존)
+        result = re.sub(r'미쳤다(?!는)', '미쳤네요', result)  # 미쳤다 → 미쳤네요 (단독)
+        result = re.sub(r'대박이다(는)', r'대박이다\1', result)
+        result = re.sub(r'대박이다(?!는)', '대박이네요', result)
+        result = re.sub(r'보인다(는)', r'보인다\1', result)
+        result = re.sub(r'보인다(?!는)', '보이네요', result)   # 좋아 보인다 → 좋아 보이네요
+        result = re.sub(r'같다(는)', r'같다\1', result)
+        result = re.sub(r'같다(?!는)', '같네요', result)       # ~것 같다 → ~것 같네요
         # 끝 어미 교체
         result = re.sub(r'구나(([!~?]{1,2}|[🥰😳])*)$', r'군요\1', result)   # 이거구나 → 이거군요
         result = re.sub(r'[다당](([!~?]{1,2}|[🥰😳])*)$', r'네요\1', result)  # ~다!! → ~네요!!
