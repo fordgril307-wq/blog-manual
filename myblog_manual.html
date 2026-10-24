@@ -188,6 +188,68 @@
     section, .section, .card, .step, table, .tip, .warn-box, .code-block, .tg-mock, .appendix, .mockup, .table-wrap { page-break-inside: avoid; break-inside: avoid; }
     h1, h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
   }
+
+  /* === 섹션 네비바 === */
+  #sec-nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 200;
+    background: var(--primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 max(12px, env(safe-area-inset-left, 0px));
+    height: 44px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    transform: translateY(-100%);
+    transition: transform .25s ease;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  #sec-nav.visible { transform: translateY(0); }
+  #sec-nav .nav-btn {
+    background: rgba(255,255,255,.18);
+    border: none;
+    color: #fff;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #sec-nav .nav-btn:disabled { opacity: .35; cursor: default; }
+  #sec-nav .nav-center {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 8px;
+  }
+
+  /* === 위로 버튼 === */
+  #top-btn {
+    position: fixed;
+    bottom: max(24px, env(safe-area-inset-bottom, 0px));
+    right: max(20px, env(safe-area-inset-right, 0px));
+    z-index: 200;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(0,0,0,.3);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #top-btn.visible { opacity: 1; pointer-events: auto; }
 </style>
 
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
@@ -898,7 +960,109 @@ python myblog_auto.py</div>
 </div>
 
 <footer class="footer">
-  블로그 자동화 매뉴얼 v3.4 · 문의: 관리자에게 연락하세요
+  블로그 자동화 매뉴얼 v3.3 · 문의: 관리자에게 연락하세요
 </footer>
 
 </div>
+
+<!-- 섹션 네비바 -->
+<nav id="sec-nav" aria-label="섹션 이동">
+  <button id="nav-prev" class="nav-btn" aria-label="이전 섹션">◀</button>
+  <span class="nav-center" id="nav-label">목차</span>
+  <button id="nav-next" class="nav-btn" aria-label="다음 섹션">▶</button>
+</nav>
+
+<!-- 위로 버튼 -->
+<button id="top-btn" aria-label="맨 위로">↑</button>
+
+<script>
+(function () {
+  var SECTIONS = [
+    { id: 's1', label: '1. 시작 전 준비물' },
+    { id: 's2', label: '2. 프로그램 설치 및 실행' },
+    { id: 's3', label: '3. 화면 구성 이해하기' },
+    { id: 's4', label: '4. 이웃 방문 모드 설정' },
+    { id: 's5', label: '5. 검색어 모드 설정' },
+    { id: 's6', label: '6. 이웃추가 자동화 설정' },
+    { id: 's7', label: '7. 실행 및 모니터링' },
+    { id: 's8', label: '8. 자주 묻는 질문' },
+    { id: 'a1', label: '부록 A — Gemini API 키' },
+    { id: 'a2', label: '부록 B — 텔레그램 봇' },
+    { id: 'a3', label: '부록 C — 크롬 영구 로그인' },
+  ];
+
+  var nav     = document.getElementById('sec-nav');
+  var label   = document.getElementById('nav-label');
+  var prevBtn = document.getElementById('nav-prev');
+  var nextBtn = document.getElementById('nav-next');
+  var topBtn  = document.getElementById('top-btn');
+  var curIdx  = -1;
+
+  function getElements() {
+    return SECTIONS.map(function(s){ return document.getElementById(s.id); });
+  }
+
+  function getCurrentIdx(els) {
+    var scrollY = window.scrollY || window.pageYOffset;
+    var mid = scrollY + window.innerHeight * 0.35;
+    var best = -1;
+    for (var i = 0; i < els.length; i++) {
+      if (els[i] && els[i].offsetTop <= mid) best = i;
+    }
+    return best;
+  }
+
+  function update() {
+    var scrollY = window.scrollY || window.pageYOffset;
+    var els = getElements();
+    var idx = getCurrentIdx(els);
+
+    // 위로 버튼
+    if (scrollY > 250) topBtn.classList.add('visible');
+    else topBtn.classList.remove('visible');
+
+    // 네비바 (헤더 벗어나면 표시)
+    var headerH = document.querySelector('.site-header') ? document.querySelector('.site-header').offsetHeight : 200;
+    if (scrollY > headerH * 0.6) nav.classList.add('visible');
+    else nav.classList.remove('visible');
+
+    if (idx === curIdx) return;
+    curIdx = idx;
+
+    if (idx < 0) {
+      label.textContent = '목차';
+      prevBtn.disabled = true;
+      nextBtn.disabled = SECTIONS.length === 0;
+    } else {
+      label.textContent = SECTIONS[idx].label;
+      prevBtn.disabled = idx <= 0;
+      nextBtn.disabled = idx >= SECTIONS.length - 1;
+    }
+  }
+
+  function scrollTo(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var offset = 52; // 네비바 높이
+    var top = el.getBoundingClientRect().top + (window.scrollY || window.pageYOffset) - offset;
+    window.scrollTo({ top: top, behavior: 'smooth' });
+  }
+
+  prevBtn.addEventListener('click', function () {
+    var idx = curIdx <= 0 ? 0 : curIdx - 1;
+    scrollTo(SECTIONS[idx].id);
+  });
+
+  nextBtn.addEventListener('click', function () {
+    var idx = curIdx < 0 ? 0 : Math.min(curIdx + 1, SECTIONS.length - 1);
+    scrollTo(SECTIONS[idx].id);
+  });
+
+  topBtn.addEventListener('click', function () {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+})();
+</script>
