@@ -1015,6 +1015,7 @@ _LOG_FILTER_KEYWORDS = [
     "오류", "에러", "error", "Error",
     "완료", "성공", "✅", "🎯",
     "블로그 방문", "방문",
+    "[AI원문]", "[AI댓글]", "폴백", "AI 입력", "제목:",
 ]
 
 def _filter_log_lines(log_lines):
@@ -1328,6 +1329,12 @@ def generate_comment(title, preview=""):
             complete = next((l for l in lines if re.search(r'[요용ㅎ!~🥰😳]$', l)), None)
             result = complete if complete else lines[0]
 
+        # 프롬프트 역출력 필터 (Gemini가 프롬프트를 그대로 반환한 경우)
+        _prompt_leak = ['아래의 규칙', '댓글을 작성해주세요', '귀엽고 발랄한 20대', '규칙에 맞춰서']
+        if any(kw in result for kw in _prompt_leak):
+            glog("  [!] AI가 프롬프트 역출력 → 랜덤 폴백", "warn")
+            return get_fallback_comment()
+
         # 한자 필터
         for char in result:
             if '一' <= char <= '鿿':
@@ -1365,12 +1372,12 @@ def generate_comment(title, preview=""):
         if post_type == "정보":
             result = result.rstrip("~! ") + " 감사합니다!"
 
-        # 완결 검증 — 한글/이모지/ㅎ/!로 끝나면 OK (매우 관대)
-        if re.search(r'[가-힣ㅎ!~🥰😳]$', result):
+        # 완결 검증 — 10자 이상이고 비어있지 않으면 OK (이모지 끝도 허용)
+        if result and len(result) >= 10:
             glog(f"  [AI댓글] {result}", "success")
             return result
 
-        glog(f"  [!] AI 결과 불완전({result[:40]}) → 랜덤 폴백", "warn")
+        glog(f"  [!] AI 결과 너무 짧음({result[:40]}) → 랜덤 폴백", "warn")
         return get_fallback_comment()
     except Exception as e:
         glog(f"  Gemini 오류 → 랜덤 폴백: {e}", "warn")
@@ -1384,45 +1391,57 @@ def get_commenters(driver):
     commenters = []
     seen = set()
 
-    # 댓글 패널 로드 대기 (최대 5초)
-    panel_xp = '//*[contains(@id,"naverComment_") and contains(@id,"_wai_u_cbox_content_wrap_tabpanel")]'
+    # 피드 댓글 패널 로드 대기 (최대 5초)
+    # 피드에서 열리는 댓글창: /html/body/div[1]/div[3]/div[2]/.../div[4]/ul/li[1]
+    feed_panel_xp = '/html/body/div[1]/div[3]/div[2]/div/div/div/div[2]/div/div/div/div[4]/ul'
     for _ in range(10):
         try:
-            driver.find_element(By.XPATH, panel_xp + '/ul/li[1]')
+            driver.find_element(By.XPATH, feed_panel_xp + '/li[1]')
             break
         except:
             rnd(0.3, 0.5)
 
-    # 댓글 수: span 텍스트 → 실패 시 li 개수 직접 세기
-    try:
-        count_el = driver.find_element(By.XPATH,
-            '//*[@id="root"]/div[3]/div[2]/div/div/div/div[1]/div/div[1]/h2/span')
-        total = int(count_el.text.strip().replace(',',''))
-        glog(f"  댓글 {total}개", "dim")
-    except:
-        try:
-            lis = driver.find_elements(By.XPATH, panel_xp + '/ul/li')
-            total = len(lis)
-            glog(f"  댓글 {total}개 (li 직접 수집)", "dim")
-        except:
-            total = 50
+    rnd(0.5, 1.0)
 
-    rnd(1.0, 2.0)
-    for li in range(1, total+1):
+    # 피드 댓글 패널에서 li 수집
+    li_els = []
+    try:
+        li_els = driver.find_elements(By.XPATH, feed_panel_xp + '/li')
+    except: pass
+
+    # 피드 패널 못 찾으면 naverComment 기반(블로그 포스팅 직접 접근 시) 시도
+    if not li_els:
+        panel_xp = '//*[contains(@id,"naverComment_") and contains(@id,"_wai_u_cbox_content_wrap_tabpanel")]'
         try:
-            a = driver.find_element(By.XPATH,
-                f'{panel_xp}/ul/li[{li}]/div[1]/div/div[1]/span[1]/a')
-            ne = driver.find_element(By.XPATH,
-                f'{panel_xp}/ul/li[{li}]/div[1]/div/div[1]/span[1]/a/span/span/span')
-            nick = ne.text.strip()
+            li_els = driver.find_elements(By.XPATH, panel_xp + '/ul/li')
+        except: pass
+
+    # 그래도 없으면 cbox_list 클래스로 시도
+    if not li_els:
+        try:
+            li_els = driver.find_elements(By.XPATH, '//*[contains(@class,"cbox_list")]/li')
+        except: pass
+
+    glog(f"  댓글 li {len(li_els)}개", "dim")
+
+    for li_el in li_els:
+        try:
+            # 확인된 구조: .//div[1]/div/div[1]/span[1]/a (class="u_cbox_name", href에 blogId=)
+            a = li_el.find_element(By.XPATH, './/div[1]/div/div[1]/span[1]/a')
             href = a.get_attribute('href') or ''
-            if nick and href and nick not in seen:
-                seen.add(nick)
-                bid = href.split('blogId=')[-1].split('&')[0] if 'blogId=' in href \
-                      else href.split('blog.naver.com/')[-1].split('?')[0].split('/')[0]
-                if bid:
-                    commenters.append(bid)
-                    glog(f"  수집: {nick} → {bid}", "dim")
+            if not href or 'blogId=' not in href:
+                continue
+            bid = href.split('blogId=')[1].split('&')[0]
+            if not bid or bid in seen:
+                continue
+            # 닉네임: span.u_cbox_nick
+            try:
+                nick = li_el.find_element(By.XPATH, './/span[@class="u_cbox_nick"]').text.strip()
+            except:
+                nick = bid
+            seen.add(bid)
+            commenters.append(bid)
+            glog(f"  수집: {nick} → {bid}", "dim")
         except: continue
     glog(f"  총 {len(commenters)}명", "info")
     return commenters
@@ -2138,24 +2157,20 @@ def run_neighbor_mode(driver, start, end, feed_url):
                 except Exception:
                     pass
 
-            # 버튼 재수집 (페이지 재로드 후)
-            for _ in range(max(0, btn_no - 3)):
-                driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
-                rnd(0.2, 0.6)
-
             try:
-                # 버튼이 충분히 로드될 때까지 추가 스크롤
+                # 필요한 버튼이 보일 때까지만 스크롤 (최대 10회)
                 needed_idx = btn_no - start  # 0-based index needed
-                for _extra in range(30):  # 최대 30회 추가 스크롤 시도
+                fresh_btns = []
+                for _extra in range(10):
                     fresh_btns = driver.find_elements(By.XPATH,
                         '//ul//div/div/div/div[3]/div[2]/button')
                     if not fresh_btns:
                         fresh_btns = driver.find_elements(By.XPATH,
                             '//div[3]/div[2]/button[.//i]')
                     if len(fresh_btns) > needed_idx:
-                        break  # 충분히 수집됨
+                        break  # 충분히 수집됨 → 더 스크롤 안 함
                     driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
-                    rnd(0.15, 0.35)
+                    rnd(0.3, 0.6)
 
                 glog(f"  버튼 {len(fresh_btns)}개 수집, 필요 인덱스: {needed_idx}", "dim")
                 if not fresh_btns or needed_idx >= len(fresh_btns):
@@ -2168,12 +2183,73 @@ def run_neighbor_mode(driver, start, end, feed_url):
                 except Exception:
                     driver.execute_script("arguments[0].click();", btn_el)
                 rnd(2.0, 4.5)
+                # 댓글창 열리면 '첫 댓글로' 버튼 클릭 (답글 많으면 아래로 내려가 있음)
+                try:
+                    _top_btn = driver.find_element(By.XPATH,
+                        '/html/body/div[1]/div[3]/div[2]/div/div/div/div[2]/div/div/div/div[6]/a')
+                    driver.execute_script("arguments[0].click();", _top_btn)
+                    rnd(0.5, 1.0)
+                except:
+                    try:
+                        driver.execute_script("window.scrollTo(0, 0);")
+                        rnd(0.3, 0.6)
+                    except: pass
             except Exception as e:
                 glog(f"  댓글창 열기 실패: {e}", "error"); continue
 
             commenters = get_commenters(driver)
             if not commenters:
-                glog("  댓글 작성자 없음", "warn"); driver.back(); rnd(1.5, 3.0); continue
+                if stop_event.is_set():
+                    glog("⛔ 강제 중지됨", "error"); return
+                glog("  댓글 작성자 없음 → 피드 재이동 후 재시도", "warn")
+                # 피드리스트로 돌아가서 버튼 다시 클릭
+                try:
+                    driver.get(feed_url)
+                    rnd(2.0, 3.5)
+                    if stop_event.is_set():
+                        glog("⛔ 강제 중지됨", "error"); return
+                    # 팝업 처리
+                    for _popup_xp in [
+                        "/html/body/div[2]/div[1]/div[2]/div[2]/div[2]/div[2]/div/div/div[2]/div/div[2]/div/div[2]/label",
+                        "/html/body/div[6]/div[1]/div[2]/div[2]/div[2]/div[1]/div/div/div[6]/div/div[2]/div/div[2]/label",
+                    ]:
+                        try:
+                            _p = driver.find_element(By.XPATH, _popup_xp)
+                            driver.execute_script("arguments[0].click();", _p)
+                            rnd(0.3, 0.5)
+                        except: pass
+                    # 버튼 재수집 후 클릭
+                    _retry_idx = btn_no - start
+                    _retry_btns = []
+                    for _ in range(30):
+                        if stop_event.is_set():
+                            glog("⛔ 강제 중지됨", "error"); return
+                        _retry_btns = driver.find_elements(By.XPATH, '//ul//div/div/div/div[3]/div[2]/button')
+                        if not _retry_btns:
+                            _retry_btns = driver.find_elements(By.XPATH, '//div[3]/div[2]/button[.//i]')
+                        if len(_retry_btns) > _retry_idx:
+                            break
+                        driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
+                        rnd(0.15, 0.35)
+                    if _retry_btns and _retry_idx < len(_retry_btns):
+                        _rb = _retry_btns[_retry_idx]
+                        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", _rb)
+                        rnd(0.4, 0.8)
+                        try: _rb.click()
+                        except: driver.execute_script("arguments[0].click();", _rb)
+                        rnd(2.0, 4.0)
+                        if stop_event.is_set():
+                            glog("⛔ 강제 중지됨", "error"); return
+                        commenters = get_commenters(driver)
+                        if not commenters:
+                            glog("  재시도 후도 없음 → 건너뜀", "warn")
+                            continue
+                    else:
+                        glog("  재시도 버튼 못찾음 → 건너뜀", "warn")
+                        continue
+                except Exception as _re:
+                    glog(f"  재시도 실패: {_re} → 건너뜀", "warn")
+                    continue
 
             for i, blog_id in enumerate(commenters):
                 if blog_id in visited:
