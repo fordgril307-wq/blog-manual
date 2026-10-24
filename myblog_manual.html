@@ -192,81 +192,97 @@
   /* === 섹션 네비바 === */
   #sec-nav {
     position: fixed;
-    top: 0; left: 0; right: 0;
+    bottom: max(24px, env(safe-area-inset-bottom, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
     z-index: 200;
-    background: var(--accent);
+    background: rgba(30,60,30,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     color: #fff;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 max(8px, env(safe-area-inset-left, 0px));
-    height: 52px;
-    box-shadow: 0 3px 12px rgba(0,0,0,.4);
-    transform: translateY(-100%);
-    transition: transform .25s ease;
-    font-family: 'Noto Sans KR', sans-serif;
-  }
-  #sec-nav.visible { transform: translateY(0); }
-  #sec-nav .nav-btn {
-    background: rgba(255,255,255,.22);
-    border: none;
-    color: #fff;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 18px;
-    font-weight: 700;
-    cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
-    line-height: 1;
-  }
-  #sec-nav .nav-btn:disabled { opacity: .3; cursor: default; }
-  #sec-nav .nav-center {
-    flex: 1;
-    text-align: center;
-    font-size: 15px;
-    font-weight: 700;
+    align-items: stretch;
+    border-radius: 18px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.35);
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 0 6px;
-    letter-spacing: -0.3px;
+    transform: translateY(20px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform .3s ease, opacity .3s ease;
+    font-family: 'Noto Sans KR', sans-serif;
+    height: 58px;
+  }
+  #sec-nav.visible {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
   }
   #sec-nav .nav-peek {
-    font-size: 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.55);
+    font-size: 10px;
     font-weight: 500;
-    opacity: 0.75;
+    line-height: 1.4;
+    gap: 2px;
+    overflow: hidden;
+    min-width: 0;
+    transition: background .15s;
+  }
+  #sec-nav .nav-peek:active { background: rgba(255,255,255,.1); }
+  #sec-nav .nav-peek:empty { opacity: 0; pointer-events: none; }
+  #sec-nav .nav-peek .peek-arrow {
+    font-size: 14px;
+    opacity: 0.7;
+    line-height: 1;
+  }
+  #sec-nav .nav-peek .peek-title {
+    width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 80px;
-    flex-shrink: 0;
     text-align: center;
-    padding: 6px 4px;
-    cursor: pointer;
-    border-radius: 6px;
-    background: rgba(255,255,255,0.12);
-    color: #fff;
-    border: none;
-    line-height: 1.3;
   }
-  #sec-nav .nav-peek:empty { display: none; }
+  #sec-nav .nav-center {
+    flex: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    padding: 0 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-left: 1px solid rgba(255,255,255,.12);
+    border-right: 1px solid rgba(255,255,255,.12);
+    letter-spacing: -0.3px;
+  }
 
   /* === 위로 버튼 === */
   #top-btn {
     position: fixed;
-    bottom: max(28px, env(safe-area-inset-bottom, 0px));
+    bottom: max(100px, calc(env(safe-area-inset-bottom, 0px) + 76px));
     right: max(20px, env(safe-area-inset-right, 0px));
-    z-index: 200;
-    width: 52px; height: 52px;
+    z-index: 201;
+    width: 44px; height: 44px;
     border-radius: 50%;
     background: var(--accent);
     color: #fff;
     border: none;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0,0,0,.4);
+    box-shadow: 0 4px 14px rgba(0,0,0,.35);
     opacity: 0;
     pointer-events: none;
     transition: opacity .25s;
@@ -990,9 +1006,15 @@ python myblog_auto.py</div>
 
 <!-- 섹션 네비바 -->
 <nav id="sec-nav" aria-label="섹션 이동">
-  <button class="nav-peek" id="nav-peek-prev"></button>
+  <button class="nav-peek" id="nav-peek-prev">
+    <span class="peek-arrow">‹</span>
+    <span class="peek-title" id="nav-peek-prev-text"></span>
+  </button>
   <span class="nav-center" id="nav-label">목차</span>
-  <button class="nav-peek" id="nav-peek-next"></button>
+  <button class="nav-peek" id="nav-peek-next">
+    <span class="peek-title" id="nav-peek-next-text"></span>
+    <span class="peek-arrow">›</span>
+  </button>
 </nav>
 
 <!-- 위로 버튼 -->
@@ -1014,12 +1036,14 @@ python myblog_auto.py</div>
     { id: 'a3', label: '부록 C — 크롬 영구 로그인' },
   ];
 
-  var nav      = document.getElementById('sec-nav');
-  var label    = document.getElementById('nav-label');
-  var peekPrev = document.getElementById('nav-peek-prev');
-  var peekNext = document.getElementById('nav-peek-next');
-  var topBtn   = document.getElementById('top-btn');
-  var curIdx   = -1;
+  var nav          = document.getElementById('sec-nav');
+  var label        = document.getElementById('nav-label');
+  var peekPrev     = document.getElementById('nav-peek-prev');
+  var peekNext     = document.getElementById('nav-peek-next');
+  var peekPrevText = document.getElementById('nav-peek-prev-text');
+  var peekNextText = document.getElementById('nav-peek-next-text');
+  var topBtn       = document.getElementById('top-btn');
+  var curIdx       = -1;
 
   function getElements() {
     return SECTIONS.map(function(s){ return document.getElementById(s.id); });
@@ -1055,16 +1079,32 @@ python myblog_auto.py</div>
 
     if (idx < 0) {
       label.textContent = '목차';
-      peekPrev.textContent = '';
-      peekNext.textContent = SECTIONS.length > 0 ? SECTIONS[0].label : '';
+      peekPrevText.textContent = '';
+      peekPrev.style.visibility = 'hidden';
+      peekNextText.textContent = SECTIONS.length > 0 ? SECTIONS[0].label : '';
       peekNext._targetId = SECTIONS.length > 0 ? SECTIONS[0].id : '';
       peekPrev._targetId = '';
+      peekNext.style.visibility = '';
     } else {
       label.textContent = SECTIONS[idx].label;
-      peekPrev.textContent = idx > 0 ? SECTIONS[idx-1].label : '';
-      peekPrev._targetId = idx > 0 ? SECTIONS[idx-1].id : '';
-      peekNext.textContent = idx < SECTIONS.length-1 ? SECTIONS[idx+1].label : '';
-      peekNext._targetId = idx < SECTIONS.length-1 ? SECTIONS[idx+1].id : '';
+      if (idx > 0) {
+        peekPrevText.textContent = SECTIONS[idx-1].label;
+        peekPrev._targetId = SECTIONS[idx-1].id;
+        peekPrev.style.visibility = '';
+      } else {
+        peekPrevText.textContent = '';
+        peekPrev._targetId = '';
+        peekPrev.style.visibility = 'hidden';
+      }
+      if (idx < SECTIONS.length-1) {
+        peekNextText.textContent = SECTIONS[idx+1].label;
+        peekNext._targetId = SECTIONS[idx+1].id;
+        peekNext.style.visibility = '';
+      } else {
+        peekNextText.textContent = '';
+        peekNext._targetId = '';
+        peekNext.style.visibility = 'hidden';
+      }
     }
   }
 
