@@ -232,6 +232,18 @@
     padding: 0 6px;
     letter-spacing: -0.3px;
   }
+  #sec-nav .nav-peek {
+    font-size: 12px;
+    font-weight: 400;
+    opacity: 0.55;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 70px;
+    flex-shrink: 0;
+    text-align: center;
+    padding: 0 2px;
+  }
 
   /* === 위로 버튼 === */
   #top-btn {
@@ -972,7 +984,9 @@ python myblog_auto.py</div>
 <!-- 섹션 네비바 -->
 <nav id="sec-nav" aria-label="섹션 이동">
   <button id="nav-prev" class="nav-btn" aria-label="이전 섹션">◀</button>
+  <span class="nav-peek" id="nav-peek-prev"></span>
   <span class="nav-center" id="nav-label">목차</span>
+  <span class="nav-peek" id="nav-peek-next"></span>
   <button id="nav-next" class="nav-btn" aria-label="다음 섹션">▶</button>
 </nav>
 
@@ -995,12 +1009,14 @@ python myblog_auto.py</div>
     { id: 'a3', label: '부록 C — 크롬 영구 로그인' },
   ];
 
-  var nav     = document.getElementById('sec-nav');
-  var label   = document.getElementById('nav-label');
-  var prevBtn = document.getElementById('nav-prev');
-  var nextBtn = document.getElementById('nav-next');
-  var topBtn  = document.getElementById('top-btn');
-  var curIdx  = -1;
+  var nav      = document.getElementById('sec-nav');
+  var label    = document.getElementById('nav-label');
+  var peekPrev = document.getElementById('nav-peek-prev');
+  var peekNext = document.getElementById('nav-peek-next');
+  var prevBtn  = document.getElementById('nav-prev');
+  var nextBtn  = document.getElementById('nav-next');
+  var topBtn   = document.getElementById('top-btn');
+  var curIdx   = -1;
 
   function getElements() {
     return SECTIONS.map(function(s){ return document.getElementById(s.id); });
@@ -1025,9 +1041,10 @@ python myblog_auto.py</div>
     if (scrollY > 250) topBtn.classList.add('visible');
     else topBtn.classList.remove('visible');
 
-    // 네비바 (헤더 벗어나면 표시)
-    var headerH = document.querySelector('.site-header') ? document.querySelector('.site-header').offsetHeight : 200;
-    if (scrollY > headerH * 0.6) nav.classList.add('visible');
+    // 네비바 (목차 카드 지난 후 표시)
+    var tocEl = document.querySelector('.toc-wrap');
+    var tocBottom = tocEl ? tocEl.getBoundingClientRect().bottom + scrollY : 300;
+    if (scrollY > tocBottom) nav.classList.add('visible');
     else nav.classList.remove('visible');
 
     if (idx === curIdx) return;
@@ -1035,10 +1052,14 @@ python myblog_auto.py</div>
 
     if (idx < 0) {
       label.textContent = '목차';
+      peekPrev.textContent = '';
+      peekNext.textContent = SECTIONS.length > 0 ? SECTIONS[0].label : '';
       prevBtn.disabled = true;
       nextBtn.disabled = SECTIONS.length === 0;
     } else {
       label.textContent = SECTIONS[idx].label;
+      peekPrev.textContent = idx > 0 ? SECTIONS[idx-1].label : '';
+      peekNext.textContent = idx < SECTIONS.length-1 ? SECTIONS[idx+1].label : '';
       prevBtn.disabled = idx <= 0;
       nextBtn.disabled = idx >= SECTIONS.length - 1;
     }
