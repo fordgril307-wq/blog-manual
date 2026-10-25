@@ -1023,19 +1023,19 @@ def _tg_poll_commands():
                 if str(msg.get("chat", {}).get("id")) != str(_tg_chat):
                     continue
                 cmd = msg.get("text", "").strip()
-                if cmd == "/run":
+                if cmd == "시작":
                     log_queue.put(("tg_cmd", "run"))
-                elif cmd == "/pause":
+                elif cmd == "정지":
                     pause_event.set()
                     _tg_send("⏸ 일시정지")
-                elif cmd == "/resume":
+                elif cmd == "재개":
                     pause_event.clear()
                     _tg_send("▶ 재개")
-                elif cmd == "/stop":
+                elif cmd == "중지":
                     stop_event.set()
                     pause_event.clear()
                     _tg_send("⛔ 중지")
-                elif cmd == "/status":
+                elif cmd == "현황":
                     _tg_send(
                         f"📊 현황\n"
                         f"공감: {stats['hearts']}\n"

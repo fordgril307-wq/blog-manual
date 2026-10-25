@@ -676,6 +676,36 @@ python myblog_auto.py</div>
     <div class="step">
       <div class="step-num">4</div>
       <div class="step-body">
+        <strong>텔레그램으로 봇 원격 제어</strong>
+        <p>봇과의 채팅창에 아래 단어를 입력하면 PC를 건드리지 않고 원격으로 제어할 수 있습니다.</p>
+        <div class="table-wrap" style="margin-top:10px">
+          <table>
+            <thead><tr><th>입력 단어</th><th>기능</th></tr></thead>
+            <tbody>
+              <tr><td><code style="font-size:15px;font-weight:700">시작</code></td><td>봇 시작 (GUI에서 ▶ 버튼을 누른 것과 동일)</td></tr>
+              <tr><td><code style="font-size:15px;font-weight:700">정지</code></td><td>일시정지 (언제든 재개 가능)</td></tr>
+              <tr><td><code style="font-size:15px;font-weight:700">재개</code></td><td>일시정지 → 작업 재개</td></tr>
+              <tr><td><code style="font-size:15px;font-weight:700">중지</code></td><td>완전 중지 (다시 시작하려면 GUI 사용)</td></tr>
+              <tr><td><code style="font-size:15px;font-weight:700">현황</code></td><td>현재 공감·댓글·이웃 수 즉시 확인</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="tg-mock" style="margin-top:12px">
+          <div class="tg-msg" style="justify-content:flex-end"><div class="tg-bubble me">현황</div></div>
+          <div class="tg-msg">
+            <div class="tg-avatar">🤖</div>
+            <div><div class="tg-bubble">📊 현황<br>공감: 142<br>댓글: 87<br>이웃: 23<br>실행 중: 예</div><div class="tg-time">오후 3:12</div></div>
+          </div>
+        </div>
+        <div class="tip" style="margin-top:10px">
+          <span class="tip-icon">💡</span>
+          <div>슬래시(/) 없이 두 글자만 입력하면 됩니다. 한국어라 모바일에서도 입력하기 쉬워요.</div>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
         <strong>자동 휴식 모드 (배치 휴식)</strong>
         <p>봇은 사람처럼 보이기 위해 <strong>댓글 20~50개</strong>를 완료할 때마다 자동으로 휴식에 들어갑니다.</p>
         <div class="table-wrap" style="margin-top:10px">
@@ -697,7 +727,7 @@ python myblog_auto.py</div>
       </div>
     </div>
     <div class="step">
-      <div class="step-num">5</div>
+      <div class="step-num">7</div>
       <div class="step-body">
         <strong>일시정지 / 강제중지</strong>
         <ul>
@@ -708,7 +738,7 @@ python myblog_auto.py</div>
       </div>
     </div>
     <div class="step">
-      <div class="step-num">6</div>
+      <div class="step-num">8</div>
       <div class="step-body">
         <strong>완료 보고서 수신</strong>
         <p>작업이 끝나면 텔레그램으로 상세 보고서가 전송됩니다. Overview에는 <strong>공감 수 · 댓글 수 · 이웃 수</strong>가 함께 표시됩니다.</p>
