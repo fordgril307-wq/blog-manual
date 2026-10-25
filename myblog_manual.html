@@ -194,13 +194,12 @@
     position: fixed;
     bottom: 0; left: 0; right: 0;
     z-index: 200;
-    background: #1B2E1B;
-    color: #fff;
+    background: #fff;
     display: flex;
     align-items: stretch;
     height: calc(56px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    box-shadow: 0 -2px 16px rgba(0,0,0,.28);
+    box-shadow: 0 -1px 0 #e8ece8, 0 -4px 16px rgba(0,0,0,.06);
     transform: translateY(100%);
     opacity: 0;
     pointer-events: none;
@@ -222,7 +221,7 @@
     cursor: pointer;
     background: none;
     border: none;
-    color: rgba(255,255,255,.55);
+    color: #888;
     font-size: 11px;
     font-weight: 500;
     gap: 3px;
@@ -230,14 +229,14 @@
     min-width: 0;
     transition: background .12s;
   }
-  #sec-nav .nav-peek:active { background: rgba(255,255,255,.07); }
-  #sec-nav #nav-peek-prev { border-right: 1px solid rgba(255,255,255,.1); }
-  #sec-nav #nav-peek-next { border-left: 1px solid rgba(255,255,255,.1); }
+  #sec-nav .nav-peek:active { background: #f5f5f5; }
+  #sec-nav #nav-peek-prev { border-right: 1px solid #eee; }
+  #sec-nav #nav-peek-next { border-left: 1px solid #eee; }
   #sec-nav .nav-peek[data-empty="true"] { opacity: 0; pointer-events: none; }
   #sec-nav .peek-arrow {
     font-size: 10px;
-    opacity: 0.6;
-    letter-spacing: 0;
+    color: var(--accent);
+    font-weight: 700;
   }
   #sec-nav .peek-title {
     overflow: hidden;
@@ -245,6 +244,7 @@
     white-space: nowrap;
     width: 100%;
     text-align: center;
+    color: #666;
   }
   #sec-nav .nav-center {
     flex: 1.4;
@@ -253,15 +253,15 @@
     justify-content: center;
     font-size: 13px;
     font-weight: 700;
-    color: #fff;
+    color: #1a231a;
     text-align: center;
     padding: 0 8px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     letter-spacing: -0.3px;
-    border-left: 1px solid rgba(255,255,255,.1);
-    border-right: 1px solid rgba(255,255,255,.1);
+    border-left: 1px solid #eee;
+    border-right: 1px solid #eee;
   }
 
   /* === 위로 버튼 === */
@@ -270,15 +270,15 @@
     bottom: calc(68px + env(safe-area-inset-bottom, 0px));
     right: max(16px, env(safe-area-inset-right, 0px));
     z-index: 201;
-    width: 40px; height: 40px;
+    width: 38px; height: 38px;
     border-radius: 50%;
-    background: #1B2E1B;
-    color: #fff;
-    border: none;
-    font-size: 18px;
+    background: #fff;
+    color: var(--accent);
+    border: 1.5px solid #d4e0d4;
+    font-size: 17px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0,0,0,.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
     opacity: 0;
     pointer-events: none;
     transition: opacity .25s;
