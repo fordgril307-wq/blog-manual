@@ -1097,7 +1097,11 @@ python myblog_auto.py</div>
   var curIdx   = -1;
   var tabs     = [];
 
-  // 탭 생성
+  // 탭 생성 — 첫 탭이 중앙에서 시작하도록 앞뒤 spacer 삽입
+  var spacerL = document.createElement('div');
+  var spacerR = document.createElement('div');
+  spacerL.className = spacerR.className = 'snav-spacer';
+  scroll.appendChild(spacerL);
   SECTIONS.forEach(function(s, i) {
     var btn = document.createElement('button');
     btn.className = 'snav-tab';
@@ -1106,6 +1110,17 @@ python myblog_auto.py</div>
     scroll.appendChild(btn);
     tabs.push(btn);
   });
+  scroll.appendChild(spacerR);
+  // spacer 너비: 스크롤 영역 절반 - 첫 탭 절반 (레이아웃 후 계산)
+  function setSpacers() {
+    var sw = scroll.offsetWidth;
+    var fw = tabs[0] ? tabs[0].offsetWidth : 0;
+    var pad = Math.max(0, Math.floor(sw / 2 - fw / 2));
+    spacerL.style.minWidth = pad + 'px';
+    spacerR.style.minWidth = pad + 'px';
+  }
+  setSpacers();
+  window.addEventListener('resize', setSpacers);
 
   function goTo(i) {
     var el = document.getElementById(SECTIONS[i].id);
