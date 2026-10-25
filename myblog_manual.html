@@ -1111,16 +1111,15 @@ python myblog_auto.py</div>
     tabs.push(btn);
   });
   scroll.appendChild(spacerR);
-  // spacer 너비: 스크롤 영역 절반 - 첫 탭 절반 (레이아웃 후 계산)
+  // spacer 너비: 스크롤 영역 절반 (활성 탭이 항상 중앙에 오도록)
   function setSpacers() {
     var sw = scroll.offsetWidth;
-    var fw = tabs[0] ? tabs[0].offsetWidth : 0;
-    var pad = Math.max(0, Math.floor(sw / 2 - fw / 2));
-    spacerL.style.minWidth = pad + 'px';
-    spacerR.style.minWidth = pad + 'px';
+    var half = Math.max(0, Math.floor(sw / 2));
+    spacerL.style.minWidth = half + 'px';
+    spacerR.style.minWidth = half + 'px';
   }
   setSpacers();
-  window.addEventListener('resize', setSpacers);
+  window.addEventListener('resize', function() { setSpacers(); centerTab(curIdx, false); });
 
   function goTo(i) {
     var el = document.getElementById(SECTIONS[i].id);
@@ -1165,16 +1164,16 @@ python myblog_auto.py</div>
       t.classList.toggle('active', i === idx);
     });
 
-    // 현재 탭이 보이도록 스크롤
-    if (idx >= 0 && tabs[idx]) {
-      var tab = tabs[idx];
-      var sl = scroll.scrollLeft;
-      var sw = scroll.offsetWidth;
-      var tl = tab.offsetLeft;
-      var tw = tab.offsetWidth;
-      if (tl < sl + 8) scroll.scrollLeft = tl - 8;
-      else if (tl + tw > sl + sw - 8) scroll.scrollLeft = tl + tw - sw + 8;
-    }
+    // 활성 탭을 중앙으로 스크롤
+    centerTab(idx, true);
+  }
+
+  function centerTab(idx, smooth) {
+    if (idx < 0 || !tabs[idx]) return;
+    var tab = tabs[idx];
+    var sw = scroll.offsetWidth;
+    var target = tab.offsetLeft + tab.offsetWidth / 2 - sw / 2;
+    scroll.scrollTo({ left: Math.max(0, target), behavior: smooth ? 'smooth' : 'instant' });
   }
 
   topBtn.addEventListener('click', function () {
@@ -1197,6 +1196,7 @@ python myblog_auto.py</div>
   }
 
   window.addEventListener('scroll', update, { passive: true });
-  update();
+  // 레이아웃 완료 후 초기 중앙 배치
+  requestAnimationFrame(function() { setSpacers(); update(); });
 })();
 </script>
