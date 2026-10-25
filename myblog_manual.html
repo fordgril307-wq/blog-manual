@@ -195,9 +195,7 @@
     bottom: 0; left: 0; right: 0;
     z-index: 200;
     background: #fff;
-    display: flex;
-    align-items: stretch;
-    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    height: calc(52px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     box-shadow: 0 -1px 0 #e8ece8, 0 -4px 16px rgba(0,0,0,.06);
     transform: translateY(100%);
@@ -211,57 +209,43 @@
     opacity: 1;
     pointer-events: auto;
   }
-  #sec-nav .nav-peek {
-    flex: 1;
+  #sec-nav-scroll {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    height: 52px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0 8px;
+    gap: 4px;
+  }
+  #sec-nav-scroll::-webkit-scrollbar { display: none; }
+  .snav-tab {
+    flex-shrink: 0;
+    display: flex;
     align-items: center;
     justify-content: center;
     padding: 0 14px;
-    cursor: pointer;
+    height: 36px;
+    border-radius: 20px;
+    border: 1.5px solid #e0e8e0;
     background: none;
-    border: none;
     color: #888;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
-    gap: 3px;
-    overflow: hidden;
-    min-width: 0;
-    transition: background .12s;
-  }
-  #sec-nav .nav-peek:active { background: #f5f5f5; }
-  #sec-nav #nav-peek-prev { border-right: 1px solid #eee; }
-  #sec-nav #nav-peek-next { border-left: 1px solid #eee; }
-  #sec-nav .nav-peek[data-empty="true"] { opacity: 0; pointer-events: none; }
-  #sec-nav .peek-arrow {
-    font-size: 10px;
-    color: var(--accent);
-    font-weight: 700;
-  }
-  #sec-nav .peek-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
-    width: 100%;
-    text-align: center;
-    color: #666;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: background .15s, color .15s, border-color .15s;
   }
-  #sec-nav .nav-center {
-    flex: 1.4;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
+  .snav-tab:active { background: #f0f5f0; }
+  .snav-tab.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
     font-weight: 700;
-    color: #1a231a;
-    text-align: center;
-    padding: 0 8px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    letter-spacing: -0.3px;
-    border-left: 1px solid #eee;
-    border-right: 1px solid #eee;
   }
 
   /* === 위로 버튼 === */
@@ -1002,15 +986,7 @@ python myblog_auto.py</div>
 
 <!-- 섹션 네비바 -->
 <nav id="sec-nav" aria-label="섹션 이동">
-  <button class="nav-peek" id="nav-peek-prev">
-    <span class="peek-arrow">이전</span>
-    <span class="peek-title" id="nav-peek-prev-text"></span>
-  </button>
-  <span class="nav-center" id="nav-label">목차</span>
-  <button class="nav-peek" id="nav-peek-next">
-    <span class="peek-arrow">다음</span>
-    <span class="peek-title" id="nav-peek-next-text"></span>
-  </button>
+  <div id="sec-nav-scroll"></div>
 </nav>
 
 <!-- 위로 버튼 -->
@@ -1019,27 +995,41 @@ python myblog_auto.py</div>
 <script>
 (function () {
   var SECTIONS = [
-    { id: 's1', label: '1. 시작 전 준비물' },
-    { id: 's2', label: '2. 프로그램 설치 및 실행' },
-    { id: 's3', label: '3. 화면 구성 이해하기' },
-    { id: 's4', label: '4. 이웃 방문 모드 설정' },
-    { id: 's5', label: '5. 검색어 모드 설정' },
-    { id: 's6', label: '6. 이웃추가 자동화 설정' },
-    { id: 's7', label: '7. 실행 및 모니터링' },
-    { id: 's8', label: '8. 자주 묻는 질문' },
-    { id: 'a1', label: '부록 A — Gemini API 키' },
-    { id: 'a2', label: '부록 B — 텔레그램 봇' },
-    { id: 'a3', label: '부록 C — 크롬 영구 로그인' },
+    { id: 's1', label: '1. 준비물' },
+    { id: 's2', label: '2. 설치·실행' },
+    { id: 's3', label: '3. 화면 구성' },
+    { id: 's4', label: '4. 이웃 방문' },
+    { id: 's5', label: '5. 검색어 모드' },
+    { id: 's6', label: '6. 이웃추가' },
+    { id: 's7', label: '7. 모니터링' },
+    { id: 's8', label: '8. FAQ' },
+    { id: 'a1', label: 'A. Gemini키' },
+    { id: 'a2', label: 'B. 텔레그램' },
+    { id: 'a3', label: 'C. 크롬 로그인' },
   ];
 
-  var nav          = document.getElementById('sec-nav');
-  var label        = document.getElementById('nav-label');
-  var peekPrev     = document.getElementById('nav-peek-prev');
-  var peekNext     = document.getElementById('nav-peek-next');
-  var peekPrevText = document.getElementById('nav-peek-prev-text');
-  var peekNextText = document.getElementById('nav-peek-next-text');
-  var topBtn       = document.getElementById('top-btn');
-  var curIdx       = -1;
+  var nav    = document.getElementById('sec-nav');
+  var scroll = document.getElementById('sec-nav-scroll');
+  var topBtn = document.getElementById('top-btn');
+  var curIdx = -1;
+  var tabs   = [];
+
+  // 탭 생성
+  SECTIONS.forEach(function(s, i) {
+    var btn = document.createElement('button');
+    btn.className = 'snav-tab';
+    btn.textContent = s.label;
+    btn.addEventListener('click', function() { goTo(i); });
+    scroll.appendChild(btn);
+    tabs.push(btn);
+  });
+
+  function goTo(i) {
+    var el = document.getElementById(SECTIONS[i].id);
+    if (!el) return;
+    var top = el.getBoundingClientRect().top + (window.scrollY || window.pageYOffset) - 8;
+    window.scrollTo({ top: top, behavior: 'smooth' });
+  }
 
   function getElements() {
     return SECTIONS.map(function(s){ return document.getElementById(s.id); });
@@ -1073,37 +1063,22 @@ python myblog_auto.py</div>
     if (idx === curIdx) return;
     curIdx = idx;
 
-    function setPeek(btn, textEl, label, targetId) {
-      textEl.textContent = label;
-      btn._targetId = targetId;
-      btn.setAttribute('data-empty', label ? 'false' : 'true');
-    }
-    if (idx < 0) {
-      label.textContent = '목차';
-      setPeek(peekPrev, peekPrevText, '', '');
-      setPeek(peekNext, peekNextText, SECTIONS.length > 0 ? SECTIONS[0].label : '', SECTIONS.length > 0 ? SECTIONS[0].id : '');
-    } else {
-      label.textContent = SECTIONS[idx].label;
-      setPeek(peekPrev, peekPrevText, idx > 0 ? SECTIONS[idx-1].label : '', idx > 0 ? SECTIONS[idx-1].id : '');
-      setPeek(peekNext, peekNextText, idx < SECTIONS.length-1 ? SECTIONS[idx+1].label : '', idx < SECTIONS.length-1 ? SECTIONS[idx+1].id : '');
+    // 탭 활성화
+    tabs.forEach(function(t, i) {
+      t.classList.toggle('active', i === idx);
+    });
+
+    // 현재 탭이 보이도록 스크롤
+    if (idx >= 0 && tabs[idx]) {
+      var tab = tabs[idx];
+      var sl = scroll.scrollLeft;
+      var sw = scroll.offsetWidth;
+      var tl = tab.offsetLeft;
+      var tw = tab.offsetWidth;
+      if (tl < sl + 8) scroll.scrollLeft = tl - 8;
+      else if (tl + tw > sl + sw - 8) scroll.scrollLeft = tl + tw - sw + 8;
     }
   }
-
-  function scrollTo(id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    var offset = 52; // 네비바 높이
-    var top = el.getBoundingClientRect().top + (window.scrollY || window.pageYOffset) - offset;
-    window.scrollTo({ top: top, behavior: 'smooth' });
-  }
-
-  peekPrev.addEventListener('click', function () {
-    if (peekPrev._targetId) scrollTo(peekPrev._targetId);
-  });
-
-  peekNext.addEventListener('click', function () {
-    if (peekNext._targetId) scrollTo(peekNext._targetId);
-  });
 
   topBtn.addEventListener('click', function () {
     window.scrollTo({ top: 0, behavior: 'smooth' });
