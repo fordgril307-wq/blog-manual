@@ -209,6 +209,29 @@
     opacity: 1;
     pointer-events: auto;
   }
+  .snav-arrow {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 52px;
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 16px;
+    cursor: pointer;
+    transition: color .15s, opacity .15s;
+    padding: 0;
+    z-index: 1;
+  }
+  .snav-arrow:disabled { opacity: .25; cursor: default; }
+  .snav-arrow:not(:disabled):active { color: var(--accent); }
+  #sec-nav-inner {
+    display: flex;
+    align-items: center;
+    height: 52px;
+  }
   #sec-nav-scroll {
     display: flex;
     align-items: center;
@@ -218,8 +241,9 @@
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    padding: 0 8px;
+    padding: 0 4px;
     gap: 4px;
+    flex: 1;
   }
   #sec-nav-scroll::-webkit-scrollbar { display: none; }
   .snav-tab {
@@ -1016,7 +1040,11 @@ python myblog_auto.py</div>
 
 <!-- 섹션 네비바 -->
 <nav id="sec-nav" aria-label="섹션 이동">
-  <div id="sec-nav-scroll"></div>
+  <div id="sec-nav-inner">
+    <button class="snav-arrow" id="snav-prev" aria-label="이전 섹션">&#9664;</button>
+    <div id="sec-nav-scroll"></div>
+    <button class="snav-arrow" id="snav-next" aria-label="다음 섹션">&#9654;</button>
+  </div>
 </nav>
 
 <!-- 위로 버튼 -->
@@ -1038,11 +1066,13 @@ python myblog_auto.py</div>
     { id: 'a3', label: 'C. 크롬 로그인' },
   ];
 
-  var nav    = document.getElementById('sec-nav');
-  var scroll = document.getElementById('sec-nav-scroll');
-  var topBtn = document.getElementById('top-btn');
-  var curIdx = -1;
-  var tabs   = [];
+  var nav      = document.getElementById('sec-nav');
+  var scroll   = document.getElementById('sec-nav-scroll');
+  var topBtn   = document.getElementById('top-btn');
+  var prevBtn  = document.getElementById('snav-prev');
+  var nextBtn  = document.getElementById('snav-next');
+  var curIdx   = -1;
+  var tabs     = [];
 
   // 탭 생성
   SECTIONS.forEach(function(s, i) {
@@ -1090,8 +1120,10 @@ python myblog_auto.py</div>
     if (scrollY > tocBottom) nav.classList.add('visible');
     else nav.classList.remove('visible');
 
-    if (idx === curIdx) return;
-    curIdx = idx;
+    if (idx !== curIdx) {
+      curIdx = idx;
+      updateArrows();
+    }
 
     // 탭 활성화
     tabs.forEach(function(t, i) {
@@ -1113,6 +1145,21 @@ python myblog_auto.py</div>
   topBtn.addEventListener('click', function () {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
+
+  prevBtn.addEventListener('click', function () {
+    var target = curIdx > 0 ? curIdx - 1 : 0;
+    goTo(target);
+  });
+
+  nextBtn.addEventListener('click', function () {
+    var target = curIdx < SECTIONS.length - 1 ? curIdx + 1 : SECTIONS.length - 1;
+    goTo(target);
+  });
+
+  function updateArrows() {
+    prevBtn.disabled = curIdx <= 0;
+    nextBtn.disabled = curIdx >= SECTIONS.length - 1;
+  }
 
   window.addEventListener('scroll', update, { passive: true });
   update();
