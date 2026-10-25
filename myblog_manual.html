@@ -66,8 +66,7 @@
     line-height: 1.75;
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
-    padding-top: 0;
-    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-block: 0;
   }
 
   .site-header {
@@ -199,10 +198,10 @@
     height: calc(52px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     box-shadow: 0 -1px 0 #e8ece8, 0 -4px 16px rgba(0,0,0,.06);
-    transform: translateY(0);
-    opacity: 1;
-    pointer-events: auto;
-    transition: none;
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .28s;
     font-family: 'Noto Sans KR', sans-serif;
   }
   #sec-nav.visible {
@@ -1136,8 +1135,11 @@ python myblog_auto.py</div>
     if (scrollY > 250) topBtn.classList.add('visible');
     else topBtn.classList.remove('visible');
 
-    // 네비바 — 항상 표시
-    nav.classList.add('visible');
+    // 네비바 (목차 카드 지난 후 표시)
+    var tocEl = document.querySelector('.toc-wrap');
+    var tocBottom = tocEl ? tocEl.getBoundingClientRect().bottom + scrollY : 300;
+    if (scrollY > tocBottom) nav.classList.add('visible');
+    else nav.classList.remove('visible');
 
     if (idx !== curIdx) {
       curIdx = idx;
