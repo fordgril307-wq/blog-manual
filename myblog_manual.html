@@ -194,7 +194,7 @@
     position: fixed;
     bottom: 0; left: 0; right: 0;
     z-index: 200;
-    background: #fff;
+    background: var(--bg2);
     height: calc(52px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     box-shadow: 0 -1px 0 #e8ece8, 0 -4px 16px rgba(0,0,0,.06);
@@ -218,20 +218,31 @@
     height: 52px;
     background: none;
     border: none;
-    color: #aaa;
-    font-size: 16px;
+    color: var(--fg3);
     cursor: pointer;
-    transition: color .15s, opacity .15s;
+    transition: color .15s;
     padding: 0;
-    z-index: 1;
+    z-index: 3;
   }
-  .snav-arrow:disabled { opacity: .25; cursor: default; }
-  .snav-arrow:not(:disabled):active { color: var(--accent); }
+  .snav-arrow svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .snav-arrow:disabled { opacity: .22; cursor: default; }
+  .snav-arrow:not(:disabled):hover { color: var(--accent); }
+  .snav-arrow:not(:disabled):active { color: var(--accent2); }
   #sec-nav-inner {
     display: flex;
     align-items: center;
     height: 52px;
+    position: relative;
   }
+  .snav-fade {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 48px;
+    pointer-events: none;
+    z-index: 2;
+  }
+  #snav-fade-left  { left: 36px;  background: linear-gradient(to right, var(--bg2, #fff) 30%, transparent); }
+  #snav-fade-right { right: 36px; background: linear-gradient(to left,  var(--bg2, #fff) 30%, transparent); }
   #sec-nav-scroll {
     display: flex;
     align-items: center;
@@ -1045,9 +1056,15 @@ python myblog_auto.py</div>
 <!-- 섹션 네비바 -->
 <nav id="sec-nav" aria-label="섹션 이동">
   <div id="sec-nav-inner">
-    <button class="snav-arrow" id="snav-prev" aria-label="이전 섹션">&#9664;</button>
+    <button class="snav-arrow" id="snav-prev" aria-label="이전 섹션">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="snav-fade" id="snav-fade-left"></div>
     <div id="sec-nav-scroll"></div>
-    <button class="snav-arrow" id="snav-next" aria-label="다음 섹션">&#9654;</button>
+    <div class="snav-fade" id="snav-fade-right"></div>
+    <button class="snav-arrow" id="snav-next" aria-label="다음 섹션">
+      <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
   </div>
 </nav>
 
