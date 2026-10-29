@@ -36,6 +36,9 @@ CHROME_PROFILE_DIR = r"C:\blog\chrome_profile"
 CHROME_EXE         = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 import subprocess as _sp2
+from flask import Flask as _Flask, Response as _Response, jsonify as _jsonify, request as _flask_req
+import json as _json_mod
+import collections as _collections
 
 def _launch_chrome_if_needed():
     """디버그 포트가 열려있지 않으면 Chrome을 직접 실행"""
@@ -95,8 +98,26 @@ def _get_my_blog_id(driver):
     try:
         driver.get("https://m.blog.naver.com/")
         time.sleep(2)
-        # 내 블로그 링크: href="/내blogId" 또는 href="https://m.blog.naver.com/내blogId"
-        # 프로필 영역 a 태그에서 추출
+        # 방법1: LNB 내 블로그 링크에서 blogId= 파라미터 추출
+        # 예: href="https://m.blog.naver.com/PostList.naver?blogId=semieeproject"
+        try:
+            el = driver.find_element(By.XPATH, '//a[contains(@href,"blogId=") and (contains(@data-click-area,"myblog") or contains(@data-nlog-params,"my_blog") or contains(@href,"my_blog"))]')
+            href = el.get_attribute('href') or ''
+            import re as _re
+            m = _re.search(r'blogId=([^&]+)', href)
+            if m:
+                return m.group(1)
+        except: pass
+        # 방법2: data-click-area="lnb.myblog" 속성으로 찾기
+        try:
+            el = driver.find_element(By.XPATH, '//a[@data-click-area="lnb.myblog"]')
+            href = el.get_attribute('href') or ''
+            import re as _re
+            m = _re.search(r'blogId=([^&]+)', href)
+            if m:
+                return m.group(1)
+        except: pass
+        # 방법3: 기존 href 경로 방식 (폴백)
         for xp in [
             '//a[contains(@href,"blog.naver.com") and contains(@class,"MobileMyInfo")]',
             '//*[@id="gnb"]//*[contains(@href,"blog.naver.com")]',
@@ -145,6 +166,542 @@ log_queue = queue.Queue()
 stats = {"hearts": 0, "comments": 0, "blocks": 0, "skips": 0, "neighbors": 0, "running": False}
 _neighbor_limit_reached = False  # 이웃 5000명 한도 도달 시 True → 이후 이웃추가 전부 스킵
 _my_blog_id = None  # 로그인된 본인 블로그 ID (본인 게시글 댓글 스킵용)
+
+# =============================================
+# 웹 대시보드 전역
+# =============================================
+_web_log_deque  = _collections.deque(maxlen=500)   # 최근 500줄 로그 보관
+_weekly_file    = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".weekly_stats.json")
+_flask_app      = _Flask(__name__)
+_web_ctrl_queue = queue.Queue()   # 웹 버튼 → tkinter 명령 전달
+
+def _weekly_load():
+    try:
+        if os.path.exists(_weekly_file):
+            with open(_weekly_file, encoding="utf-8") as f:
+                return _json_mod.load(f)
+    except Exception:
+        pass
+    return {}
+
+def _weekly_save(data):
+    try:
+        with open(_weekly_file, "w", encoding="utf-8") as f:
+            _json_mod.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+def _weekly_add(hearts, comments, neighbors):
+    data = _weekly_load()
+    today = time.strftime("%Y-%m-%d")
+    week_key = time.strftime("%Y-W%W")
+    if week_key not in data:
+        data[week_key] = {}
+    day = data[week_key].get(today, {"hearts": 0, "comments": 0, "neighbors": 0})
+    day["hearts"]    += hearts
+    day["comments"]  += comments
+    day["neighbors"] += neighbors
+    data[week_key][today] = day
+    _weekly_save(data)
+
+def _web_append_log(msg, tag="info"):
+    ts = time.strftime("%H:%M:%S")
+    _web_log_deque.append({"t": ts, "msg": msg, "tag": tag})
+
+# ── Flask 라우트 ─────────────────────────────────────────────────
+
+@_flask_app.route("/")
+def _dash_index():
+    return _Response(_DASH_HTML, mimetype="text/html")
+
+@_flask_app.route("/api/stats")
+def _api_stats():
+    weekly = _weekly_load()
+    week_key = time.strftime("%Y-W%W")
+    week_data = weekly.get(week_key, {})
+    days = sorted(week_data.items())
+    return _jsonify({
+        "stats": {
+            "hearts":    stats["hearts"],
+            "comments":  stats["comments"],
+            "neighbors": stats["neighbors"],
+            "blocks":    stats["blocks"],
+            "skips":     stats["skips"],
+            "running":   stats["running"],
+        },
+        "weekly": days,
+        "rest_log":  list(_rest_log),
+        "block_log": list(_block_log),
+    })
+
+@_flask_app.route("/api/logs")
+def _api_logs():
+    since = int(_flask_req.args.get("since", 0))
+    logs = list(_web_log_deque)
+    return _jsonify({"logs": logs[since:], "total": len(logs)})
+
+@_flask_app.route("/api/control", methods=["POST"])
+def _api_control():
+    cmd = (_flask_req.json or {}).get("cmd", "")
+    if cmd in ("start", "stop", "resume"):
+        _web_ctrl_queue.put(cmd)
+        return _jsonify({"ok": True, "cmd": cmd})
+    return _jsonify({"ok": False, "error": "unknown cmd"}), 400
+
+# ── 대시보드 HTML ────────────────────────────────────────────────
+_SPONSORS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".sponsors.json")
+
+def _sponsors_load():
+    try:
+        with open(_SPONSORS_FILE, encoding="utf-8") as f:
+            return _json_mod.load(f)
+    except Exception:
+        return []
+
+def _sponsors_save(data):
+    try:
+        with open(_SPONSORS_FILE, "w", encoding="utf-8") as f:
+            _json_mod.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+@_flask_app.route("/api/sponsors", methods=["GET"])
+def _api_sponsors_get():
+    return _jsonify(_sponsors_load())
+
+@_flask_app.route("/api/sponsors", methods=["POST"])
+def _api_sponsors_post():
+    data = _flask_req.get_json(force=True)
+    sponsors = _sponsors_load()
+    new_id = str(int(__import__('time').time() * 1000))
+    data["id"] = new_id
+    sponsors.append(data)
+    _sponsors_save(sponsors)
+    return _jsonify({"ok": True, "id": new_id})
+
+@_flask_app.route("/api/sponsors/<sid>", methods=["PUT"])
+def _api_sponsors_put(sid):
+    data = _flask_req.get_json(force=True)
+    sponsors = _sponsors_load()
+    for i, s in enumerate(sponsors):
+        if s.get("id") == sid:
+            data["id"] = sid
+            sponsors[i] = data
+            _sponsors_save(sponsors)
+            return _jsonify({"ok": True})
+    return _jsonify({"ok": False, "msg": "not found"}), 404
+
+@_flask_app.route("/api/sponsors/<sid>", methods=["DELETE"])
+def _api_sponsors_delete(sid):
+    sponsors = _sponsors_load()
+    sponsors = [s for s in sponsors if s.get("id") != sid]
+    _sponsors_save(sponsors)
+    return _jsonify({"ok": True})
+
+_DASH_HTML = r"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>블로그봇 대시보드</title>
+<style>
+  :root{--bg:#f0f4f0;--card:#fff;--border:#d8e8d8;--accent:#4caf50;
+    --text:#222;--dim:#888;--log-bg:#1a1f1a;--log-fg:#b8d8b8;--tab-active:#4caf50;--tab-bar:#e8f0e8;}
+  @media(prefers-color-scheme:dark){:root{--bg:#111a11;--card:#1e271e;--border:#2a3d2a;--text:#ddd;--dim:#666;--tab-bar:#1a251a;}}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;padding:0 0 40px}
+  header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 20px;
+    display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10}
+  header h1{font-size:17px;font-weight:700;color:var(--accent)}
+  #sdot{width:10px;height:10px;border-radius:50%;background:#aaa;flex-shrink:0}
+  #sdot.running{background:#4caf50;box-shadow:0 0 6px #4caf50}
+  #sdot.stopped{background:#e53935}
+  #stxt{font-size:12px;color:var(--dim)}
+  /* 탭 */
+  .tab-bar{background:var(--tab-bar);border-bottom:1px solid var(--border);display:flex;gap:0;position:sticky;top:49px;z-index:9}
+  .tab-btn{padding:10px 22px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--dim);border-bottom:3px solid transparent}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-pane{display:none}.tab-pane.active{display:block}
+  .main{max-width:1060px;margin:0 auto;padding:18px 14px;display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:14px 16px}
+  .ctitle{font-size:11px;color:var(--dim);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  .sb{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:12px 14px}
+  .si{font-size:20px}.sv{font-size:26px;font-weight:800;color:var(--accent);line-height:1.1}
+  .sl{font-size:11px;color:var(--dim)}
+  .btn-row{display:flex;gap:9px;flex-wrap:wrap}
+  .btn{padding:9px 20px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;transition:.15s}
+  .bs{background:#4caf50;color:#fff}.bs:hover{background:#388e3c}
+  .bx{background:#e53935;color:#fff}.bx:hover{background:#b71c1c}
+  .br{background:#f57c00;color:#fff}.br:hover{background:#e65100}
+  .btn-sm{padding:5px 12px;font-size:12px;border-radius:6px}
+  .btn-blue{background:#1565c0;color:#fff}.btn-blue:hover{background:#0d47a1}
+  .btn-gray{background:#888;color:#fff}.btn-gray:hover{background:#555}
+  .btn-red{background:#e53935;color:#fff}.btn-red:hover{background:#b71c1c}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;padding:6px 8px;color:var(--dim);font-weight:600;border-bottom:2px solid var(--border)}
+  td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+  tr:last-child td{border:none}
+  .trow td{font-weight:700;color:var(--accent)}
+  #log-box{background:var(--log-bg);color:var(--log-fg);border-radius:9px;
+    padding:12px;height:340px;overflow-y:auto;font-family:'Consolas','Courier New',monospace;font-size:11.5px;line-height:1.75}
+  .lt{color:#446644;margin-right:5px}
+  .tag-success{color:#4caf50}.tag-warn{color:#f57c00}.tag-error{color:#ef5350}
+  .tag-dim{color:#555}.tag-header{color:#64b5f6;font-weight:700}.tag-info{color:#b8d8b8}
+  .mlog{max-height:130px;overflow-y:auto;font-size:12px}
+  .mr{display:flex;gap:7px;padding:3px 0;border-bottom:1px solid var(--border)}
+  .mr:last-child{border:none}.mt{color:var(--dim);flex-shrink:0}
+  /* 협찬 상태 뱃지 */
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+  .badge-active{background:#e8f5e9;color:#2e7d32}
+  .badge-done{background:#e3f2fd;color:#1565c0}
+  .badge-wait{background:#fff8e1;color:#f57c00}
+  /* 협찬 폼 */
+  .sp-form{display:flex;flex-direction:column;gap:9px;padding:14px;background:var(--card);
+    border:1px solid var(--border);border-radius:11px;margin-bottom:14px}
+  .sp-form .fr{display:flex;gap:9px;flex-wrap:wrap}
+  .sp-form input,.sp-form select,.sp-form textarea{
+    background:var(--bg);border:1px solid var(--border);border-radius:7px;
+    padding:7px 10px;font-size:13px;color:var(--text);width:100%}
+  .sp-form textarea{height:60px;resize:vertical;font-family:inherit}
+  .sp-form label{font-size:11px;color:var(--dim);font-weight:700;margin-bottom:2px}
+  .fi{display:flex;flex-direction:column;gap:3px;flex:1;min-width:150px}
+  @media(max-width:580px){.sv{font-size:20px}#log-box{height:240px}.tab-btn{padding:9px 12px;font-size:12px}}
+</style>
+</head>
+<body>
+<header>
+  <div id="sdot"></div>
+  <h1>🌿 블로그봇 대시보드</h1>
+  <span id="stxt">로딩중...</span>
+  <span style="margin-left:auto;font-size:11px;color:var(--dim)" id="upd"></span>
+</header>
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('dash')">📊 대시보드</button>
+  <button class="tab-btn" onclick="switchTab('sponsor')">🤝 협찬 관리</button>
+</div>
+
+<!-- ── 대시보드 탭 ── -->
+<div id="tab-dash" class="tab-pane active">
+<div class="main">
+  <div class="card">
+    <div class="ctitle">제어</div>
+    <div class="btn-row">
+      <button class="btn bs" onclick="ctrl('start')">▶ 시작</button>
+      <button class="btn bx" onclick="ctrl('stop')">⏹ 중지</button>
+      <button class="btn br" onclick="ctrl('resume')">⏯ 재개</button>
+    </div>
+    <p style="margin-top:9px;font-size:11px;color:var(--dim)">⚠ 시작은 GUI에서 설정 후 누르거나, 웹 버튼은 이전 설정을 재사용합니다.</p>
+  </div>
+  <div>
+    <div class="ctitle" style="padding:0 4px 7px">현재 세션</div>
+    <div class="stat-grid">
+      <div class="sb"><div class="si">🩷</div><div class="sv" id="sh">-</div><div class="sl">하트</div></div>
+      <div class="sb"><div class="si">💬</div><div class="sv" id="sc">-</div><div class="sl">댓글</div></div>
+      <div class="sb"><div class="si">➕</div><div class="sv" id="sn">-</div><div class="sl">이웃추가</div></div>
+      <div class="sb"><div class="si">⛔</div><div class="sv" id="sb2">-</div><div class="sl">차단</div></div>
+      <div class="sb"><div class="si">⏭</div><div class="sv" id="ss">-</div><div class="sl">스킵</div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card" style="flex:1;min-width:240px">
+      <div class="ctitle">이번 주 누적</div>
+      <table>
+        <thead><tr><th>날짜</th><th>🩷</th><th>💬</th><th>➕</th></tr></thead>
+        <tbody id="wtb"><tr><td colspan="4" style="color:var(--dim);text-align:center;padding:8px">데이터 없음</td></tr></tbody>
+        <tfoot><tr style="font-weight:700;color:var(--accent)">
+          <td>합계</td><td id="wh">0</td><td id="wc">0</td><td id="wn">0</td>
+        </tr></tfoot>
+      </table>
+    </div>
+    <div class="card" style="flex:1;min-width:200px">
+      <div class="ctitle">휴식 기록</div>
+      <div class="mlog" id="rlog"><span style="color:var(--dim);font-size:12px">없음</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle" style="display:flex;justify-content:space-between">
+      <span>실시간 로그</span>
+      <label style="font-size:11px;color:var(--dim);display:flex;align-items:center;gap:4px;font-weight:400;text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="asc" checked> 자동 스크롤
+      </label>
+    </div>
+    <div id="log-box"></div>
+  </div>
+</div>
+</div>
+
+<!-- ── 협찬 관리 탭 ── -->
+<div id="tab-sponsor" class="tab-pane">
+<div class="main">
+  <div id="sp-form-wrap" class="sp-form">
+    <div class="ctitle" id="sp-form-title">새 협찬 추가</div>
+    <input type="hidden" id="sp-edit-id">
+    <div class="fr">
+      <div class="fi"><label>블로그명 *</label><input id="sp-name" placeholder="ex) 오뷰티"></div>
+      <div class="fi"><label>URL</label><input id="sp-url" placeholder="https://blog.naver.com/..."></div>
+    </div>
+    <div class="fr">
+      <div class="fi"><label>날짜</label><input id="sp-date" type="date"></div>
+      <div class="fi"><label>상태</label>
+        <select id="sp-status">
+          <option value="대기">⏳ 대기</option>
+          <option value="진행중">🔵 진행중</option>
+          <option value="완료">✅ 완료</option>
+        </select>
+      </div>
+    </div>
+    <div class="fi"><label>메모</label><textarea id="sp-memo" placeholder="협찬 내용, 조건, 연락처 등"></textarea></div>
+    <div class="btn-row">
+      <button class="btn bs btn-sm" onclick="spSave()">💾 저장</button>
+      <button class="btn btn-gray btn-sm" onclick="spCancelEdit()">취소</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center">
+      <span>협찬 리스트</span>
+      <span id="sp-count" style="font-size:12px;color:var(--dim)"></span>
+    </div>
+    <div style="overflow-x:auto">
+    <table id="sp-table">
+      <thead>
+        <tr>
+          <th>블로그명</th><th>URL</th><th>날짜</th><th>상태</th><th>메모</th><th style="width:100px">작업</th>
+        </tr>
+      </thead>
+      <tbody id="sp-tbody">
+        <tr><td colspan="6" style="color:var(--dim);text-align:center;padding:12px">데이터 없음</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+/* ── 탭 전환 ── */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['dash','sponsor'][i]===name));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.toggle('active',p.id==='tab-'+name));
+  if(name==='sponsor') loadSponsors();
+}
+
+/* ── 대시보드 폴링 ── */
+let off=0;
+const today=new Date().toISOString().slice(0,10);
+async function pollStats(){
+  try{
+    const d=await(await fetch('/api/stats')).json();
+    const s=d.stats;
+    const dot=document.getElementById('sdot');
+    dot.className=s.running?'running':'stopped';
+    document.getElementById('stxt').textContent=s.running?'실행 중':'대기 / 중지';
+    document.getElementById('sh').textContent=s.hearts;
+    document.getElementById('sc').textContent=s.comments;
+    document.getElementById('sn').textContent=s.neighbors;
+    document.getElementById('sb2').textContent=s.blocks;
+    document.getElementById('ss').textContent=s.skips;
+    const tb=document.getElementById('wtb');
+    if(d.weekly&&d.weekly.length>0){
+      let wh=0,wc=0,wn=0;
+      tb.innerHTML=d.weekly.map(([dt,v])=>{
+        wh+=v.hearts||0;wc+=v.comments||0;wn+=v.neighbors||0;
+        const it=dt===today;
+        return`<tr class="${it?'trow':''}"><td>${dt.slice(5)}${it?' 📍':''}</td><td>${v.hearts||0}</td><td>${v.comments||0}</td><td>${v.neighbors||0}</td></tr>`;
+      }).join('');
+      document.getElementById('wh').textContent=wh;
+      document.getElementById('wc').textContent=wc;
+      document.getElementById('wn').textContent=wn;
+    }
+    const rl=document.getElementById('rlog');
+    if(d.rest_log&&d.rest_log.length>0)
+      rl.innerHTML=d.rest_log.map(([cnt,mn,t])=>`<div class="mr"><span class="mt">${t}</span><span>💬${cnt}개 후 ☕${mn}분</span></div>`).join('');
+    document.getElementById('upd').textContent='업데이트: '+new Date().toLocaleTimeString('ko-KR');
+  }catch(e){}
+}
+async function pollLogs(){
+  try{
+    const d=await(await fetch('/api/logs?since='+off)).json();
+    if(d.logs&&d.logs.length>0){
+      const box=document.getElementById('log-box');
+      d.logs.forEach(l=>{
+        const el=document.createElement('div');
+        el.innerHTML=`<span class="lt">${l.t}</span><span class="tag-${l.tag||'info'}">${esc(l.msg)}</span>`;
+        box.appendChild(el);
+      });
+      off=d.total;
+      if(document.getElementById('asc').checked) box.scrollTop=box.scrollHeight;
+    }
+  }catch(e){}
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+async function ctrl(cmd){
+  try{await fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd})});}
+  catch(e){alert('서버 연결 오류');}
+}
+pollStats();pollLogs();
+setInterval(pollStats,3000);setInterval(pollLogs,1500);
+
+/* ── 협찬 CRUD ── */
+const BADGE={
+  '대기':'<span class="badge badge-wait">⏳ 대기</span>',
+  '진행중':'<span class="badge badge-active">🔵 진행중</span>',
+  '완료':'<span class="badge badge-done">✅ 완료</span>'
+};
+let _spData=[];
+
+async function loadSponsors(){
+  try{
+    _spData=await(await fetch('/api/sponsors')).json();
+    renderSponsors();
+  }catch(e){}
+}
+function renderSponsors(){
+  const tb=document.getElementById('sp-tbody');
+  document.getElementById('sp-count').textContent=_spData.length+'건';
+  if(!_spData.length){
+    tb.innerHTML='<tr><td colspan="6" style="color:var(--dim);text-align:center;padding:12px">데이터 없음</td></tr>';
+    return;
+  }
+  tb.innerHTML=_spData.map(s=>`
+    <tr>
+      <td><strong>${esc(s.name||'')}</strong></td>
+      <td>${s.url?`<a href="${esc(s.url)}" target="_blank" style="color:var(--accent);font-size:11px">🔗 링크</a>`:'—'}</td>
+      <td>${s.date||'—'}</td>
+      <td>${BADGE[s.status]||s.status}</td>
+      <td style="max-width:200px;white-space:pre-wrap;font-size:11px">${esc(s.memo||'')}</td>
+      <td><div class="btn-row"><button class="btn btn-blue btn-sm" onclick="spEdit('${s.id}')">✏ 수정</button>
+          <button class="btn btn-red btn-sm" onclick="spDel('${s.id}')">🗑</button></div></td>
+    </tr>`).join('');
+}
+function spEdit(id){
+  const s=_spData.find(x=>x.id===id);
+  if(!s)return;
+  document.getElementById('sp-edit-id').value=id;
+  document.getElementById('sp-name').value=s.name||'';
+  document.getElementById('sp-url').value=s.url||'';
+  document.getElementById('sp-date').value=s.date||'';
+  document.getElementById('sp-status').value=s.status||'대기';
+  document.getElementById('sp-memo').value=s.memo||'';
+  document.getElementById('sp-form-title').textContent='협찬 수정';
+  document.getElementById('sp-form-wrap').scrollIntoView({behavior:'smooth'});
+}
+function spCancelEdit(){
+  document.getElementById('sp-edit-id').value='';
+  document.getElementById('sp-name').value='';
+  document.getElementById('sp-url').value='';
+  document.getElementById('sp-date').value='';
+  document.getElementById('sp-status').value='대기';
+  document.getElementById('sp-memo').value='';
+  document.getElementById('sp-form-title').textContent='새 협찬 추가';
+}
+async function spSave(){
+  const nm=document.getElementById('sp-name').value.trim();
+  if(!nm){alert('블로그명을 입력해주세요.');return;}
+  const payload={
+    name:nm,
+    url:document.getElementById('sp-url').value.trim(),
+    date:document.getElementById('sp-date').value,
+    status:document.getElementById('sp-status').value,
+    memo:document.getElementById('sp-memo').value.trim()
+  };
+  const eid=document.getElementById('sp-edit-id').value;
+  if(eid){
+    await fetch('/api/sponsors/'+eid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  } else {
+    await fetch('/api/sponsors',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  }
+  spCancelEdit();
+  loadSponsors();
+}
+async function spDel(id){
+  if(!confirm('삭제할까요?'))return;
+  await fetch('/api/sponsors/'+id,{method:'DELETE'});
+  loadSponsors();
+}
+// 오늘 날짜 기본값
+document.getElementById('sp-date').value=today;
+</script>
+</body>
+</html>
+"""
+
+def _web_ctrl_watcher(dashboard_instance):
+    while True:
+        try:
+            cmd = _web_ctrl_queue.get(timeout=1)
+            if cmd == "start":
+                dashboard_instance.root.after(0, dashboard_instance._on_start)
+            elif cmd == "stop":
+                dashboard_instance.root.after(0, dashboard_instance._on_stop)
+            elif cmd == "resume":
+                dashboard_instance.root.after(0, dashboard_instance._on_resume)
+        except Exception:
+            pass
+
+def _ngrok_start():
+    """ngrok으로 5001 포트를 외부에 노출하고 공개 URL을 반환.
+    ngrok이 없으면 None 반환 (조용히 실패).
+    """
+    import subprocess as _ngp
+    import time as _time
+    try:
+        _ngp.Popen(
+            ["ngrok", "http", "5001", "--log=stdout"],
+            stdout=_ngp.DEVNULL, stderr=_ngp.DEVNULL,
+            creationflags=getattr(_ngp, "CREATE_NO_WINDOW", 0)
+        )
+        # ngrok API가 올라올 때까지 최대 6초 대기
+        import urllib.request as _ur
+        for _ in range(12):
+            _time.sleep(0.5)
+            try:
+                with _ur.urlopen("http://127.0.0.1:4040/api/tunnels", timeout=1) as r:
+                    import json as _j
+                    data = _j.loads(r.read())
+                    tunnels = data.get("tunnels", [])
+                    for t in tunnels:
+                        url = t.get("public_url", "")
+                        if url.startswith("https://"):
+                            return url
+            except Exception:
+                continue
+    except FileNotFoundError:
+        print("[대시보드] ngrok 없음 — 로컬에서만 접속 가능")
+    except Exception as e:
+        print(f"[대시보드] ngrok 오류: {e}")
+    return None
+
+def _start_web_dashboard():
+    import threading as _wt
+    # Flask 먼저 시작
+    t = _wt.Thread(
+        target=lambda: _flask_app.run(host="0.0.0.0", port=5001, debug=False, use_reloader=False),
+        daemon=True, name="WebDash"
+    )
+    t.start()
+    # ngrok 터널 → 텔레그램 알림 (별도 스레드, Flask 시작과 병렬)
+    def _notify():
+        import time as _time
+        _time.sleep(1)  # Flask 바인딩 대기
+        pub_url = _ngrok_start()
+        if pub_url:
+            print(f"[대시보드] 외부 접속: {pub_url}")
+            # 텔레그램 토큰이 아직 주입 전일 수 있으므로 최대 10초 대기
+            for _ in range(20):
+                if _tg_token and _tg_chat:
+                    break
+                _time.sleep(0.5)
+            _tg_send(f"🌿 블로그봇 대시보드 시작!\n📱 폰에서 접속: {pub_url}")
+        else:
+            import socket as _sock
+            try:
+                local_ip = _sock.gethostbyname(_sock.gethostname())
+            except Exception:
+                local_ip = "localhost"
+            print(f"[대시보드] 로컬 접속: http://{local_ip}:5001")
+    _wt.Thread(target=_notify, daemon=True, name="NgrokNotify").start()
 
 # ── 절전 방지 (Windows) ──
 import ctypes
@@ -753,9 +1310,11 @@ class BlogDashboard:
         self.status_dot.config(text="●  실행중", fg="#28C840")
 
         _prevent_sleep()
-        # 텔레그램 원격 제어 polling 스레드 (이미 실행 중이면 데몬이므로 중복 무방)
-        tg_poll_t = threading.Thread(target=_tg_poll_commands, daemon=True)
-        tg_poll_t.start()
+        # 텔레그램 원격 제어 polling 스레드 — 싱글턴 (이미 살아있으면 새로 시작 안 함)
+        global _tg_poll_thread
+        if _tg_poll_thread is None or not _tg_poll_thread.is_alive():
+            _tg_poll_thread = threading.Thread(target=_tg_poll_commands, daemon=True)
+            _tg_poll_thread.start()
         t = threading.Thread(target=_run_worker, args=(cfg,), daemon=True)
         t.start()
         _tg_send(f"🚀 블로그봇 시작 ({time.strftime('%H:%M')})")
@@ -796,12 +1355,19 @@ def rnd(a, b):
 
 # 네이버 측 제한 — 일시정지 필요 (내 계정/IP 차단)
 _BLOCK_KEYWORDS  = ['잠시 후', '이용해주세요', '일시적', '비정상']
+# 하루 댓글 한도 초과 — 오늘은 더 이상 댓글 불가, 중단
+# 실제 팝업 텍스트: "이미 제한된 개수의 글을 등록하여 더이상 등록할 수 없습니다."
+_RATELIMIT_KEYWORDS = ['제한된 개수', '하루', '너무 많', '댓글을 많이', '과다', '일정 횟수']
 # 블로그 주인 설정 — 그냥 다음 블로그로 스킵
-_SKIP_KEYWORDS   = ['스팸 차단', '등록할 수 없습니다', '제한']
+# 실제 팝업 텍스트: "스팸 차단" 또는 블로그 주인이 댓글 막은 경우
+_SKIP_KEYWORDS   = ['스팸 차단', '댓글을 등록할 수 없습니다', '댓글 기능이']
 
 def dismiss_alert(driver):
     """페이지 이동/액션 후 브라우저 alert 체크 — 있으면 텍스트 기록 후 확인 누름.
-    네이버 차단 → 'blocked' (일시정지), 블로그 주인 스팸차단 → 'skip' (다음으로), 없으면 None."""
+    네이버 차단 → 'blocked' (일시정지)
+    댓글 과다 작성 → 'ratelimit' (대기 후 재시도, 블로그 스킵 X)
+    블로그 주인 스팸차단 → 'skip' (다음 블로그로)
+    없으면 None."""
     try:
         alert = Alert(driver)
         txt = alert.text
@@ -814,11 +1380,19 @@ def dismiss_alert(driver):
             auto_pause("오류 발생")
             wait_if_paused()
             return 'blocked'
+        if any(k in txt for k in _RATELIMIT_KEYWORDS):
+            glog("  🛑 오늘 댓글 한도 초과 — 댓글 작업 중단 (공감/이웃만 계속)", "warn")
+            stats["blocks"] = stats.get("blocks", 0) + 1
+            _block_log.append((time.strftime('%H:%M'), txt))
+            return 'ratelimit'
         if any(k in txt for k in _SKIP_KEYWORDS):
             glog("  ⏭ 블로그 주인 스팸차단 — 다음 블로그로 스킵", "warn")
             stats["skips"] = stats.get("skips", 0) + 1
             return 'skip'
-        return txt
+        # 매칭 키워드 없는 기타 알럿 — 내용 로그 남기고 스킵
+        glog(f"  ⚠ 알 수 없는 알럿({txt[:40]}) — 다음 블로그로 스킵", "warn")
+        stats["skips"] = stats.get("skips", 0) + 1
+        return 'skip'
     except Exception:
         return None
 
@@ -1003,6 +1577,7 @@ def _tg_send_file(filename, file_content, caption=""):
 
 # ── 텔레그램 원격 제어 ──
 _tg_last_update_id = 0
+_tg_poll_thread = None   # 싱글턴 — 한 번만 시작
 
 def _tg_poll_commands():
     """텔레그램 getUpdates long-polling — 별도 데몬 스레드에서 실행"""
@@ -1159,9 +1734,13 @@ Details
     else:
         glog("  ⚠️ 텔레그램 발송 실패 — 다음 시작 때 재발송됩니다", "error")
 
+    # 이번 주 누적에 세션 결과 합산
+    _weekly_add(hearts, comments, neighbors)
+
 def glog(msg, tag="info"):
     log_queue.put(("log", msg, tag))
     _session_append_log(msg)
+    _web_append_log(msg, tag)   # 웹 대시보드 로그 deque 에도 기록
 
 def gstats():
     log_queue.put(("stats",))
@@ -1651,8 +2230,10 @@ def do_like_and_comment(driver, blog_id, content_div):
         result = dismiss_alert(driver)
         if result == 'blocked':
             return 'comment_limit'
+        if result == 'ratelimit':
+            return 'comment_limit'  # 과다 작성 → 현재 블로그 댓글 포기, 다음으로 (스팸차단 아님)
         if result == 'skip':
-            return liked   # 댓글만 스킵, 공감은 이미 완료
+            return liked   # 블로그 주인 스팸차단 — 댓글만 스킵, 공감은 이미 완료
         stats["comments"] += 1
         gstats()
         glog(f"  [{blog_id}] 💬 댓글: {comment_text}", "success")
@@ -2013,10 +2594,11 @@ def batch_rest(batch_count, driver=None):
     _tg_send(f"☕ 배치 {batch_count}개 완료 — {rest_sec/60:.1f}분 휴식 시작 (이웃추가 {stats.get('neighbors', 0)}개)")
     deadline = time.time() + rest_sec
     last_keepalive = time.time()
+    _base = f"https://m.blog.naver.com/{_my_blog_id}" if _my_blog_id else "https://m.blog.naver.com"
     _keepalive_urls = [
-        "https://m.blog.naver.com/semieeproject",
-        "https://m.blog.naver.com/semieeproject?tab=1",
-        "https://m.blog.naver.com/semieeproject?tab=2",
+        _base,
+        _base + "?tab=1",
+        _base + "?tab=2",
     ]
     _keepalive_idx = 0
     while time.time() < deadline:
@@ -2341,7 +2923,11 @@ def run_neighbor_mode(driver, start, end, feed_url):
                 break   # post_idx 루프도 탈출 → while True로 돌아가 처음부터
 
         if not session_restart:
-            break   # 정상 완료 → while 탈출
+            # 정상 완료 → visited 리셋 후 피드 처음부터 재시작
+            glog(f"━━  {start}~{end}번 게시글 순회 완료 — 피드 처음부터 재시작  ━━", "warn")
+            visited = set()
+            # while True 상단으로 돌아가 피드 재로드 후 1번부터 재시작
+            # (break 하지 않음)
 
     glog(f"━━  이웃 모드 완료  🩷{stats['hearts']}  💬{stats['comments']}  ━━", "header")
 
@@ -2476,5 +3062,8 @@ def _run_worker(cfg):
 # 진입점
 # =============================================
 if __name__ == '__main__':
+    _start_web_dashboard()
+    import threading as _t2
     app = BlogDashboard()
+    _t2.Thread(target=_web_ctrl_watcher, args=(app,), daemon=True).start()
     app.run()
