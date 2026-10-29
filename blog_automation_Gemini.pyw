@@ -1833,6 +1833,9 @@ def classify_post_type(title, preview=""):
     if any(k in t for k in ["호텔","숙소","펜션","리조트","게스트하우스","풀빌라","글램핑"]): return "호텔"
     if any(k in t for k in ["여행","관광","투어","해외","국내여행","공항","비행기","명소"]): return "여행"
     if any(k in t for k in ["방법","팁","정보","추천","비교","리뷰","후기","꿀팁","노하우","가이드"]): return "정보"
+    if any(k in t for k in ["강아지","고양이","반려견","반려묘","반려동물","펫","냥이","냥냥",
+                              "멍멍","댕댕","포메","말티즈","시바","푸들","골든","래브라도",
+                              "집사","냥집사","먹방하는강아지","먹방하는고양이"]): return "펫"
     return "기타"
 
 
@@ -1865,6 +1868,7 @@ def get_style_examples(post_type):
         "가성비": "- 우와 진짜 가성비 괜찮은데요?!\n- 되게 괜찮네요~!\n- 이거 완전 득템이네요ㅎㅎ",
         "여행":   "- 너무 즐거워보여요 부러워요~!\n- 저도 꼭 가보고싶어요!\n- 사진이 너무 예뻐요ㅎㅎ",
         "정보":   "- 도움 많이 됐어요!\n- 알고싶었던 정보예요ㅎㅎ\n- 기억해둬야겠어요!\n- 이런 정보 진짜 유용해요~!",
+        "펫":     "- 너무 귀여워요ㅎㅎ 보는것만으로도 힐링돼요~!\n- 진짜 너무 사랑스러워요🥰\n- 사진 보는 것만으로도 행복해져요!!\n- 완전 귀여워요😻 에너지 받고가요~!",
     }
     return styles.get(post_type, None)
 
@@ -1895,6 +1899,8 @@ def generate_comment(title, preview=""):
     recipe_ins = ""
     if post_type == "레시피":
         recipe_ins = "\n- 장소 방문 표현 절대 금지. 칭찬 표현만."
+    if post_type == "펫":
+        recipe_ins = "\n- 음식/맛집 표현 절대 금지('맛있어보여요', '비주얼 대박', '먹어보고싶어요' 등). 동물 귀여움/힐링 표현만."
 
     style_ins = f"\n[예시]\n{style}\n위 느낌으로 새롭게 써줘." if style else ""
     preview_text = preview[:200] if preview and preview.strip() else "없음"
