@@ -702,6 +702,18 @@ def _start_web_dashboard():
                 local_ip = "localhost"
             print(f"[대시보드] 로컬 접속: http://{local_ip}:5001")
     _wt.Thread(target=_notify, daemon=True, name="NgrokNotify").start()
+    # Flask 뜨면 브라우저 자동 열기
+    def _open_browser():
+        import time as _time, webbrowser as _wb, urllib.request as _ur
+        for _ in range(30):  # 최대 15초 대기
+            _time.sleep(0.5)
+            try:
+                _ur.urlopen("http://127.0.0.1:5001", timeout=1)
+                _wb.open("http://127.0.0.1:5001")
+                break
+            except Exception:
+                pass
+    _wt.Thread(target=_open_browser, daemon=True, name="BrowserOpen").start()
 
 # ── 절전 방지 (Windows) ──
 import ctypes
