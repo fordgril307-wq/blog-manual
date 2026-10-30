@@ -2085,19 +2085,20 @@ def get_commenters(driver):
 # 공통: 블로그 방문 → 정렬 → 좋아요+댓글
 # =============================================
 def do_like_and_comment(driver, blog_id, content_div):
-    # 좋아요
+    # 좋아요 — 카드형/리스트형 레이아웃 무관하게 aria-pressed 속성으로 탐색
+    # contentslist_block 안의 첫 번째 또는 두 번째 li 내 좋아요 버튼을 찾음
     liked = False
-    # 좋아요 XPath: div/div[2]/ul (기본) + div[3]/div/div[2]/ul (신규 레이아웃)
-    _like_xpaths = []
-    for _mid in ['div/div[2]', 'div[3]/div/div[2]']:
-        for _d1 in ['div[1]', 'div[2]']:
-            for _d3 in ['div[3]', 'div[4]', 'div[2]']:
-                _like_xpaths.append(
-                    f'//*[@id="contentslist_block"]/div[{content_div}]/{_mid}/ul/li[1]'
-                    f'/{_d1}/{_d3}/div[1]/div/div/div/a'
-                )
     like_a = None
-    for _xp in _like_xpaths:
+    _like_base = f'//*[@id="contentslist_block"]/div[{content_div}]'
+    _like_candidates = [
+        # 첫 번째 li 안의 공감 버튼 (aria-pressed 기준)
+        _like_base + '//ul/li[1]//a[@aria-pressed]',
+        # 두 번째 li (카드형에서 첫 포스팅이 li[2]인 경우)
+        _like_base + '//ul/li[2]//a[@aria-pressed]',
+        # contentslist_block 전체 범위에서 첫 번째 공감 버튼
+        '//*[@id="contentslist_block"]//a[@aria-pressed][1]',
+    ]
+    for _xp in _like_candidates:
         try:
             like_a = driver.find_element(By.XPATH, _xp)
             break
@@ -2109,7 +2110,10 @@ def do_like_and_comment(driver, blog_id, content_div):
         if like_a.get_attribute('aria-pressed') == 'true':
             glog(f"  [{blog_id}] 이미 좋아요 → 스킵", "dim")
             return False
-        like_a.find_element(By.XPATH, './span/span').click()
+        try:
+            like_a.find_element(By.XPATH, './span/span').click()
+        except Exception:
+            driver.execute_script("arguments[0].click();", like_a)
         rnd(0.3, 1.2)
         liked = True
         stats["hearts"] += 1
