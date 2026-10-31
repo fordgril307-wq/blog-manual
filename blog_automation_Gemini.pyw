@@ -786,7 +786,7 @@ async function pollStats(){
     const bcard=document.getElementById('blog-stat-card');
     if(bt){
       bcard.style.display='';
-      // 오늘 섹션
+      // 어제 섹션
       const nc=bt.neighbor_change;
       document.getElementById('bh').textContent=bt.hearts??'-';
       document.getElementById('bc').textContent=bt.comments??'-';
@@ -795,10 +795,21 @@ async function pollStats(){
         bncEl.textContent=(nc>=0?'+':'')+nc;
         bncEl.style.color=nc>0?'#2ecc71':nc<0?'#e74c3c':'var(--dim)';
       } else { bncEl.textContent='-'; bncEl.style.color=''; }
-      // 이달 누적 섹션
-      document.getElementById('bv').textContent=bt.visitors??'-';
-      document.getElementById('bvw').textContent=bt.views??'-';
-      document.getElementById('bnt').textContent=bt.neighbor_total??'-';
+      // 이달 누적 섹션 — 방문자/조회수 합산, 이웃수는 weekly 중 가장 최근값
+      let mVisitors=0, mViews=0, mNeighborTotal=null;
+      if(d.weekly&&d.weekly.length>0){
+        const thisMonth=new Date().toISOString().slice(0,7);
+        d.weekly.forEach(([dt,v])=>{
+          if(dt.startsWith(thisMonth)){
+            mVisitors+=(v.visitors||0);
+            mViews+=(v.views||0);
+          }
+          if(v.neighbor_total!=null) mNeighborTotal=v.neighbor_total; // 마지막값
+        });
+      }
+      document.getElementById('bv').textContent=mVisitors||'-';
+      document.getElementById('bvw').textContent=mViews||'-';
+      document.getElementById('bnt').textContent=mNeighborTotal??'-';
       if(bt.updated_at) document.getElementById('bstat-time').textContent='어제 기준 · '+bt.updated_at+' 수집';
     } else { bcard.style.display='none'; }
     const rl=document.getElementById('rlog');
