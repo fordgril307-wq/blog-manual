@@ -985,6 +985,17 @@ class BlogDashboard:
                  highlightthickness=1, highlightbackground="#D0DDD0"
                  ).pack(fill=tk.X, ipady=5)
 
+        # GitHub 토큰 행
+        gh_row = tk.Frame(c1, bg="#FFFFFF")
+        gh_row.pack(fill=tk.X, padx=14, pady=(0, 12))
+        tk.Label(gh_row, text="GitHub 토큰 (ngrok URL 자동 업로드 · 선택)", font=F_SMALL,
+                 bg="#FFFFFF", fg="#555").pack(anchor="w")
+        self.gh_token_var = tk.StringVar(value="")
+        tk.Entry(gh_row, textvariable=self.gh_token_var, show="*", font=("Courier", 8),
+                 bg="#F7FAF7", relief=tk.FLAT, bd=0,
+                 highlightthickness=1, highlightbackground="#D0DDD0"
+                 ).pack(fill=tk.X, ipady=5)
+
         # ── 카드 2: 모드 선택 ──
         c2 = card(left, "⚙️  실행 모드")
         self.mode_var = tk.StringVar(value="이웃")
@@ -1309,7 +1320,9 @@ class BlogDashboard:
             prem_min = int(self.prem_min_var.get().strip())
         except ValueError:
             prem_min = 100
-        cfg = {"api_key": api_key, "tg_token": tg_token, "tg_chat": tg_chat, "mode": self.mode_var.get(),
+        cfg = {"api_key": api_key, "tg_token": tg_token, "tg_chat": tg_chat,
+               "gh_token": self.gh_token_var.get().strip(),
+               "mode": self.mode_var.get(),
                "add_neighbor": self.add_neighbor_var.get(),
                "neighbor_msg": self.neighbor_msg_text.get("1.0", tk.END).strip() if self.add_neighbor_var.get() else "",
                "prem_group": self.prem_group_var.get().strip(),
