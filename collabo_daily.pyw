@@ -393,16 +393,6 @@ def main():
             page.goto(BOARD)
             log("보드 탭을 열었어요. claude.ai 로그인이 안 돼 있으면 그 탭에서 로그인하고, 보드가 보이면 탭만 닫으세요(크롬은 닫지 않아도 돼요).")
             return
-        if "--ngrok" in sys.argv:
-            try:
-                fr, _ = board_frame(page)
-                push_ngrok(fr)
-            finally:
-                try:
-                    page.close()
-                except Exception:
-                    pass
-            return
         try:
             run(page)
             heavy_file = BASE / "last_heavy.txt"
@@ -436,89 +426,11 @@ def main():
                 pass
 
 
-NGROK_SRC = "https://raw.githubusercontent.com/fordgril307-wq/blog-manual/main/ngrok_url.txt"
-
-# 블로그 자동화 봇(.weekly_stats.json)이 있는 폴더. 환경변수로 바꿀 수 있음.
-BLOG_DIR = Path(os.environ.get("BLOG_DIR", r"C:\blog"))
-
-
-def push_blog_stats(fr):
-    """블로그 자동화 봇이 쌓은 일별 공감·댓글·이웃·방문자·새공감·새댓글 통계를 보드에 올린다.
-
-    .weekly_stats.json 구조:
-      {"2026-W44": {"2026-10-31": {
-          "hearts": 5, "comments": 3, "neighbors": 2,
-          "visitors": 120, "neighbor_total": 350,
-          "new_comments": 2, "new_hearts": 4
-      }}, ...}
-
-    보드의 window.cbBlogStats([{
-        date, hearts, comments, neighbors,
-        visitors, neighbor_total, new_comments, new_hearts
-    }, ...]) 를 호출한다.
-    """
-    stats_file = BLOG_DIR / ".weekly_stats.json"
-    if not stats_file.exists():
-        log("블로그 통계 파일 없음", stats_file)
-        return
-    try:
-        raw = json.loads(stats_file.read_text(encoding="utf-8"))
-    except Exception as e:
-        log("블로그 통계 파일 읽기 실패", e)
-        return
-    rows = []
-    for week_data in raw.values():
-        if not isinstance(week_data, dict):
-            continue
-        for date, counts in week_data.items():
-            if not isinstance(counts, dict):
-                continue
-            rows.append({
-                "date": date,
-                "hearts": counts.get("hearts", 0),
-                "comments": counts.get("comments", 0),
-                "neighbors": counts.get("neighbors", 0),
-                # 네이버 블로그 통계 (있을 때만 포함)
-                "visitors": counts.get("visitors"),
-                "neighbor_total": counts.get("neighbor_total"),
-                "new_comments": counts.get("new_comments"),
-                "new_hearts": counts.get("new_hearts"),
-            })
-    rows.sort(key=lambda r: r["date"])
-    if not rows:
-        log("블로그 통계: 데이터 없음")
-        return
-    try:
-        res = fr.evaluate("d => window.cbBlogStats ? window.cbBlogStats(d) : 'old'", rows)
-        log(f"블로그 통계 보드에 올림 {len(rows)}일치", res)
-    except Exception as e:
-        log("블로그 통계 올리기 실패", e)
-
-
-def push_ngrok(fr):
-    """자동화 대시보드(ngrok) 주소를 GitHub에서 읽어 보드에 올린다. 보드 화면은 외부 주소를 직접 못 읽어서 수집기가 대신 전달."""
-    try:
-        import requests
-        r = requests.get(NGROK_SRC + "?t=" + str(int(time.time())), timeout=20)
-        if r.status_code != 200:
-            log("ngrok 주소 파일 없음", r.status_code)
-            return
-        m = re.search(r"https?://[^\s\"'<>]+", r.text)
-        if not m:
-            log("ngrok 주소 파일이 비어 있음")
-            return
-        res = fr.evaluate("u => window.cbSetNgrok ? window.cbSetNgrok(u) : 'old'", m.group(0))
-        log("ngrok 주소 보드에 올림", res)
-    except Exception as e:
-        log("ngrok 주소 올리기 실패", e)
-
 
 def run(page):
         fr, st = board_frame(page)
         if not st.get("canWrite"):
             raise RuntimeError("이 계정은 보드에 쓸 권한이 없어요")
-        push_ngrok(fr)
-        push_blog_stats(fr)
         pend = BASE / "pending_import.json"
         if pend.exists():
             try:
