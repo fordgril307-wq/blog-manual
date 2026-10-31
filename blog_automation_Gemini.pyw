@@ -1875,6 +1875,18 @@ Details
     # 이번 주 누적에 세션 결과 합산
     _weekly_add(hearts, comments, neighbors)
 
+    # 블로그 통계 → 콜라보 보드 push
+    try:
+        import subprocess as _subp
+        _collabo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "collabo", "collabo_daily.pyw")
+        if os.path.exists(_collabo):
+            _subp.Popen([sys.executable, _collabo], creationflags=0x08000000)  # CREATE_NO_WINDOW
+            glog("📊 콜라보 보드 통계 업데이트 중...", "info")
+        else:
+            glog(f"⚠️ collabo_daily.pyw 없음: {_collabo}", "error")
+    except Exception as _e:
+        glog(f"⚠️ 콜라보 보드 push 실패: {_e}", "error")
+
 def glog(msg, tag="info"):
     log_queue.put(("log", msg, tag))
     _session_append_log(msg)
