@@ -202,7 +202,8 @@ def _weekly_save(data):
     except Exception:
         pass
 
-def _weekly_add(hearts, comments, neighbors, visitors=None, neighbor_total=None, new_comments=None, new_hearts=None):
+def _weekly_add(hearts, comments, neighbors, visitors=None, neighbor_total=None,
+                neighbor_change=None, new_comments=None, new_hearts=None):
     data = _weekly_load()
     today = time.strftime("%Y-%m-%d")
     week_key = time.strftime("%Y-W%W")
@@ -212,10 +213,12 @@ def _weekly_add(hearts, comments, neighbors, visitors=None, neighbor_total=None,
     day["hearts"]    += hearts
     day["comments"]  += comments
     day["neighbors"] += neighbors
-    if visitors      is not None: day["visitors"]       = visitors
-    if neighbor_total is not None: day["neighbor_total"] = neighbor_total
-    if new_comments  is not None: day["new_comments"]   = new_comments
-    if new_hearts    is not None: day["new_hearts"]     = new_hearts
+    if visitors        is not None: day["visitors"]        = visitors
+    if neighbor_total  is not None: day["neighbor_total"]  = neighbor_total
+    if neighbor_change is not None: day["neighbor_change"] = neighbor_change
+    if new_comments    is not None: day["new_comments"]    = new_comments
+    if new_hearts      is not None: day["new_hearts"]      = new_hearts
+    day["updated_at"] = time.strftime("%H:%M")
     data[week_key][today] = day
     _weekly_save(data)
 
@@ -235,14 +238,15 @@ def _push_blog_stats_to_board(blog_stats, hearts, comments, neighbors):
             return
         today = time.strftime("%Y-%m-%d")
         row = {
-            "date":           today,
-            "hearts":         hearts,
-            "comments":       comments,
-            "neighbors":      neighbors,
-            "visitors":       blog_stats.get("visitors"),
-            "neighbor_total": blog_stats.get("neighbor_total"),
-            "new_comments":   blog_stats.get("new_comments"),
-            "new_hearts":     blog_stats.get("new_hearts"),
+            "date":            today,
+            "hearts":          hearts,
+            "comments":        comments,
+            "neighbors":       neighbors,
+            "visitors":        blog_stats.get("visitors"),
+            "neighbor_total":  blog_stats.get("neighbor_total"),
+            "neighbor_change": blog_stats.get("neighbor_change"),
+            "new_comments":    blog_stats.get("new_comments"),
+            "new_hearts":      blog_stats.get("new_hearts"),
         }
         # None 값 제거 (JS 쪽에서 undefined 처리 맞게)
         row = {k: v for k, v in row.items() if v is not None}
@@ -326,79 +330,52 @@ def _board_js(js_call):
 
 
 def _fetch_blog_daily_stats(driver):
-    """네이버 블로그 통계 API에서 오늘 방문자수·이웃수·새 공감·새 댓글을 가져온다."""
-    import re as _re, json as _j
+    """blog.stat.naver.com/m/blog/daily/cv 에서 오늘·전날 통계를 수집한다.
+    반환 dict 키: visitors, hearts, comments, neighbor_change, neighbor_total
+    """
+    import re as _re
     result = {}
     try:
-        # 블로그 ID 확보
-        blog_id = _my_blog_id
-        if not blog_id:
+        # ── blog.stat 페이지 로드 ──
+        driver.get("https://blog.stat.naver.com/m/blog/daily/cv")
+        time.sleep(3)
+
+        def _xpath_int(xp, default=None):
             try:
-                driver.get("https://m.blog.naver.com/")
-                time.sleep(2)
-                src = driver.page_source
-                m = _re.search(r'blogId["\s:=]+(["\']?)([a-zA-Z0-9_]+)\1', src)
+                el = driver.find_element(By.XPATH, xp)
+                txt = el.text.strip().replace(",", "")
+                return int(_re.sub(r"[^\d\-]", "", txt))
+            except Exception:
+                return default
+
+        # 오늘 통계 (div[2] 블록)
+        visitors       = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[1]/ul/li[1]/a/div/div/strong")
+        hearts         = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[1]/a/div/div/strong")
+        comments       = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[2]/a/div/div/strong")
+        neighbor_change= _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[3]/a/div/div/strong")
+
+        if visitors       is not None: result["visitors"]        = visitors
+        if hearts         is not None: result["hearts"]          = hearts
+        if comments       is not None: result["comments"]        = comments
+        if neighbor_change is not None: result["neighbor_change"] = neighbor_change
+
+        glog(f"📊 오늘 방문자:{visitors}  공감:{hearts}  댓글:{comments}  이웃증감:{neighbor_change:+d}", "info")
+
+        # ── 이웃 총 수 — m.blog.naver.com PostList ──
+        try:
+            blog_id = _my_blog_id or "semieeproject"
+            driver.get(f"https://m.blog.naver.com/PostList.naver?blogId={blog_id}&tab=1")
+            time.sleep(2)
+            try:
+                el = driver.find_element(By.XPATH, "/html/body/div[1]/div[3]/div/div[2]/div[2]/div[2]/span[3]")
+                m = _re.search(r"([\d,]+)명", el.text)
                 if m:
-                    blog_id = m.group(2)
+                    result["neighbor_total"] = int(m.group(1).replace(",", ""))
+                    glog(f"📊 총 이웃수: {result['neighbor_total']}명", "info")
             except Exception:
                 pass
-        if not blog_id:
-            glog("⚠️ 블로그 ID를 못 찾아 통계 생략", "error")
-            return result
-
-        today_str = time.strftime("%Y%m%d")
-
-        # 1) 방문자수 — 블로그 통계 API
-        try:
-            url = f"https://blog.naver.com/VisitorCountAsync.naver?blogId={blog_id}&startDate={today_str}&endDate={today_str}"
-            driver.get(url)
-            time.sleep(1.5)
-            src = driver.find_element(By.TAG_NAME, "body").text
-            m = _re.search(r'"totalCount"\s*:\s*(\d+)', src)
-            if not m:
-                m = _re.search(r'(\d+)', src.strip())
-            if m:
-                result["visitors"] = int(m.group(1))
-                glog(f"📊 오늘 방문자: {result['visitors']}명", "info")
-        except Exception as e:
-            glog(f"⚠️ 방문자수 수집 실패: {e}", "error")
-
-        # 2) 이웃수 — 블로그 이웃 현황 API
-        try:
-            url = f"https://blog.naver.com/FollowerList.naver?blogId={blog_id}"
-            driver.get(url)
-            time.sleep(1.5)
-            src = driver.find_element(By.TAG_NAME, "body").text
-            m = _re.search(r'"neighborCount"\s*:\s*(\d+)', src)
-            if not m:
-                m = _re.search(r'totalCount["\s:]+(\d+)', src)
-            if m:
-                result["neighbor_total"] = int(m.group(1))
-                glog(f"📊 현재 이웃수: {result['neighbor_total']}명", "info")
         except Exception as e:
             glog(f"⚠️ 이웃수 수집 실패: {e}", "error")
-
-        # 3) 새 공감·댓글 — 알림 페이지
-        try:
-            driver.get("https://www.naver.com/")
-            time.sleep(1.5)
-            src = driver.page_source
-            new_h = len(_re.findall(r'공감|좋아요', src))
-            new_c = len(_re.findall(r'댓글', src))
-            # 더 정확하게: 알림 API
-            driver.get("https://api.noti.naver.com/noti/getStatus")
-            time.sleep(1.5)
-            src2 = driver.find_element(By.TAG_NAME, "body").text
-            try:
-                noti = _j.loads(src2)
-                unread = noti.get("result", {})
-                result["new_comments"] = int(unread.get("comment", 0))
-                result["new_hearts"]   = int(unread.get("sympathyAll", unread.get("sympathy", 0)))
-                glog(f"📊 새 댓글: {result['new_comments']}개  새 공감: {result['new_hearts']}개", "info")
-            except Exception:
-                pass
-        except Exception as e:
-            glog(f"⚠️ 새 공감/댓글 수집 실패: {e}", "error")
 
     except Exception as e:
         glog(f"⚠️ 블로그 통계 수집 오류: {e}", "error")
@@ -419,6 +396,8 @@ def _api_stats():
     weekly = _weekly_load()
     week_key = time.strftime("%Y-W%W")
     week_data = weekly.get(week_key, {})
+    today = time.strftime("%Y-%m-%d")
+    today_data = week_data.get(today, {})
     days = sorted(week_data.items())
     return _jsonify({
         "stats": {
@@ -430,6 +409,14 @@ def _api_stats():
             "running":   stats["running"],
         },
         "weekly": days,
+        "blog_today": {
+            "visitors":        today_data.get("visitors"),
+            "hearts":          today_data.get("hearts"),
+            "comments":        today_data.get("comments"),
+            "neighbor_total":  today_data.get("neighbor_total"),
+            "neighbor_change": today_data.get("neighbor_change"),
+            "updated_at":      today_data.get("updated_at"),
+        } if today_data else None,
         "rest_log":  list(_rest_log),
         "block_log": list(_block_log),
     })
@@ -593,6 +580,44 @@ _DASH_HTML = r"""<!DOCTYPE html>
       <button class="btn br" onclick="ctrl('resume')">⏯ 재개</button>
     </div>
     <p style="margin-top:9px;font-size:11px;color:var(--dim)">⚠ 시작은 GUI에서 설정 후 누르거나, 웹 버튼은 이전 설정을 재사용합니다.</p>
+  </div>
+  <!-- 오늘 블로그 현황 -->
+  <div class="card" id="blog-stat-card" style="display:none">
+    <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center">
+      <span>오늘 블로그 현황</span>
+      <span id="bstat-time" style="font-size:10px;color:var(--dim)"></span>
+    </div>
+    <div class="stat-grid">
+      <div class="sb">
+        <div class="si">👀</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <div class="sv" id="bv">-</div>
+        </div>
+        <div class="sl">방문자</div>
+      </div>
+      <div class="sb">
+        <div class="si">🩷</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <div class="sv" id="bh">-</div>
+        </div>
+        <div class="sl">공감</div>
+      </div>
+      <div class="sb">
+        <div class="si">💬</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <div class="sv" id="bc">-</div>
+        </div>
+        <div class="sl">댓글</div>
+      </div>
+      <div class="sb">
+        <div class="si">🤝</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <div class="sv" id="bnt">-</div>
+          <div class="sd" id="bnc" style="font-size:12px;font-weight:700"></div>
+        </div>
+        <div class="sl">이웃수</div>
+      </div>
+    </div>
   </div>
   <div>
     <div class="ctitle" style="padding:0 4px 7px">현재 세션</div>
