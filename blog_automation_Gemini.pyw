@@ -956,8 +956,10 @@ class BlogDashboard:
 
         api_gh_row = tk.Frame(c1, bg="#FFFFFF")
         api_gh_row.pack(fill=tk.X, padx=14, pady=(2, 8))
+        api_gh_row.columnconfigure(0, weight=1, uniform="api")
+        api_gh_row.columnconfigure(1, weight=1, uniform="api")
         api_left = tk.Frame(api_gh_row, bg="#FFFFFF")
-        api_left.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
+        api_left.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         tk.Label(api_left, text="Gemini API 키", font=F_SMALL,
                  bg="#FFFFFF", fg="#555").pack(anchor="w")
         self.api_var = tk.StringVar(value="AQ.Ab8RN6K8NupguNFf5N7oEb_kAYR8Ru3i-awbPjIMTYUwJW710g")
@@ -966,7 +968,7 @@ class BlogDashboard:
                                  highlightthickness=1, highlightbackground="#D0DDD0")
         self.api_text.pack(fill=tk.X, ipady=5)
         api_right = tk.Frame(api_gh_row, bg="#FFFFFF")
-        api_right.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        api_right.grid(row=0, column=1, sticky="ew")
         tk.Label(api_right, text="GitHub 토큰 (선택)", font=F_SMALL,
                  bg="#FFFFFF", fg="#555").pack(anchor="w")
         self.gh_token_var = tk.StringVar(value="")
