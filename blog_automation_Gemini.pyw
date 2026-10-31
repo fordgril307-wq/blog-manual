@@ -246,6 +246,7 @@ def _push_blog_stats_to_board(blog_stats, hearts, comments, neighbors):
             "visitors":        blog_stats.get("visitors"),
             "neighbor_total":  blog_stats.get("neighbor_total"),
             "neighbor_change": blog_stats.get("neighbor_change"),
+            "views":           blog_stats.get("views"),
             "new_comments":    blog_stats.get("new_comments"),
             "new_hearts":      blog_stats.get("new_hearts"),
         }
