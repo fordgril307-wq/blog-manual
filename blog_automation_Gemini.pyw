@@ -977,9 +977,11 @@ class BlogDashboard:
 
         tg_row = tk.Frame(c1, bg="#FFFFFF")
         tg_row.pack(fill=tk.X, padx=14, pady=(2, 12))
+        tg_row.columnconfigure(0, weight=1, uniform="tg")
+        tg_row.columnconfigure(1, weight=1, uniform="tg")
         # 봇 토큰
         tg_left = tk.Frame(tg_row, bg="#FFFFFF")
-        tg_left.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
+        tg_left.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         tk.Label(tg_left, text="텔레그램 봇 토큰", font=F_SMALL,
                  bg="#FFFFFF", fg="#555").pack(anchor="w")
         self.tg_token_var = tk.StringVar(value="")
@@ -989,7 +991,7 @@ class BlogDashboard:
                  ).pack(fill=tk.X, ipady=5)
         # 채팅 ID
         tg_right = tk.Frame(tg_row, bg="#FFFFFF")
-        tg_right.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        tg_right.grid(row=0, column=1, sticky="ew")
         tk.Label(tg_right, text="텔레그램 채팅 ID", font=F_SMALL,
                  bg="#FFFFFF", fg="#555").pack(anchor="w")
         self.tg_chat_var = tk.StringVar(value="")
