@@ -331,14 +331,15 @@ def _board_js(js_call):
 
 
 def _fetch_blog_daily_stats(driver):
-    """blog.stat.naver.com/m/blog/daily/cv 에서 오늘 통계를 수집한다.
+    """blog.stat.naver.com/m/blog/daily/visit 에서 전날 확정 통계를 수집한다.
+    '이전 기간 조회' 버튼 클릭 → 전날 확정값 수집.
     반환 dict 키: visitors, hearts, comments, neighbor_change, views, neighbor_total
     """
     import re as _re
     result = {}
     try:
-        # ── blog.stat 페이지 로드 ──
-        driver.get("https://blog.stat.naver.com/m/blog/daily/cv")
+        # ── /daily/visit 페이지 로드 ──
+        driver.get("https://blog.stat.naver.com/m/blog/daily/visit")
         time.sleep(3)
 
         def _xpath_int(xp, default=None):
@@ -349,20 +350,40 @@ def _fetch_blog_daily_stats(driver):
             except Exception:
                 return default
 
-        # 오늘 통계
+        # ── '이전 기간 조회' 버튼 클릭 → 전날 데이터로 전환 ──
+        try:
+            prev_btn = driver.find_element(By.XPATH,
+                "/html/body/div/div/div[2]/header/div/div[4]/div/div/div/div/a/span")
+            prev_btn.click()
+            time.sleep(2)
+        except Exception as e:
+            glog(f"⚠️ 이전 기간 버튼 클릭 실패: {e}", "error")
+
+        # ── 전날 확정 통계 (방문자/공감/댓글/이웃증감) ──
         visitors        = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[1]/ul/li[1]/a/div/div/strong")
-        hearts          = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[1]/a/div/div/strong")
-        comments        = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[2]/a/div/div/strong")
-        neighbor_change = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[3]/a/div/div/strong")
-        views           = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[2]/div/div[2]/div[2]/div/ul/li/span")
+        hearts          = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[1]/ul/li[2]/a/div/div/strong")
+        comments        = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[2]/ul/li[1]/a/div/div/strong")
+        neighbor_change = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[2]/ul/li[2]/a/div/div/strong")
 
         if visitors        is not None: result["visitors"]        = visitors
         if hearts          is not None: result["hearts"]          = hearts
         if comments        is not None: result["comments"]        = comments
         if neighbor_change is not None: result["neighbor_change"] = neighbor_change
-        if views           is not None: result["views"]           = views
 
-        glog(f"📊 오늘 방문자:{visitors}  조회수:{views}  공감:{hearts}  댓글:{comments}  이웃증감:{neighbor_change:+d}", "info")
+        # ── 방문횟수(조회수) 탭 클릭 후 수집 ──
+        try:
+            views_tab = driver.find_element(By.XPATH,
+                "/html/body/div/div/div[2]/div/div[1]/div[2]/div/div[1]/div/nav/div/ul/li[2]/a/span")
+            views_tab.click()
+            time.sleep(2)
+            views = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[2]/div/div[2]/div[2]/div/ul/li/span")
+            if views is not None: result["views"] = views
+        except Exception as e:
+            glog(f"⚠️ 방문횟수 탭 수집 실패: {e}", "error")
+            views = None
+
+        nc_str = f"{neighbor_change:+d}" if neighbor_change is not None else "?"
+        glog(f"📊 전날 방문자:{visitors}  조회수:{views}  공감:{hearts}  댓글:{comments}  이웃증감:{nc_str}", "info")
 
         # ── 이웃 총 수 — m.blog.naver.com PostList ──
         try:
@@ -760,6 +781,26 @@ async function pollStats(){
       document.getElementById('wc').textContent=wc;
       document.getElementById('wn').textContent=wn;
     }
+    // ── 블로그 현황 카드 ──
+    const bt=d.blog_today;
+    const bcard=document.getElementById('blog-stat-card');
+    if(bt){
+      bcard.style.display='';
+      // 오늘 섹션
+      const nc=bt.neighbor_change;
+      document.getElementById('bh').textContent=bt.hearts??'-';
+      document.getElementById('bc').textContent=bt.comments??'-';
+      const bncEl=document.getElementById('bnc');
+      if(nc!=null){
+        bncEl.textContent=(nc>=0?'+':'')+nc;
+        bncEl.style.color=nc>0?'#2ecc71':nc<0?'#e74c3c':'var(--dim)';
+      } else { bncEl.textContent='-'; bncEl.style.color=''; }
+      // 이달 누적 섹션
+      document.getElementById('bv').textContent=bt.visitors??'-';
+      document.getElementById('bvw').textContent=bt.views??'-';
+      document.getElementById('bnt').textContent=bt.neighbor_total??'-';
+      if(bt.updated_at) document.getElementById('bstat-time').textContent='전날 기준 '+bt.updated_at+' 수집';
+    } else { bcard.style.display='none'; }
     const rl=document.getElementById('rlog');
     if(d.rest_log&&d.rest_log.length>0)
       rl.innerHTML=d.rest_log.map(([cnt,mn,t])=>`<div class="mr"><span class="mt">${t}</span><span>💬${cnt}개 후 ☕${mn}분</span></div>`).join('');
