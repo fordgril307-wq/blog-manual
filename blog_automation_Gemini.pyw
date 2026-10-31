@@ -350,7 +350,17 @@ def _fetch_blog_daily_stats(driver):
             except Exception:
                 return default
 
-        # ── Step 1: '이전 기간 조회' 버튼 클릭 → 전날 데이터로 전환 ──
+        # ── Step 1: 방문횟수 탭 먼저 클릭 ──
+        views = None
+        try:
+            views_tab = driver.find_element(By.XPATH,
+                "/html/body/div/div/div[2]/div/div[1]/div[2]/div/div[1]/div/nav/div/ul/li[2]/a/span")
+            views_tab.click()
+            time.sleep(2)
+        except Exception as e:
+            glog(f"⚠️ 방문횟수 탭 클릭 실패: {e}", "error")
+
+        # ── Step 2: '이전 기간 조회' 버튼 한 번 클릭 → 전날 데이터로 전환 ──
         try:
             prev_btn = driver.find_element(By.XPATH,
                 "/html/body/div/div/div[2]/header/div/div[4]/div/div/div/div/a/span")
@@ -359,37 +369,18 @@ def _fetch_blog_daily_stats(driver):
         except Exception as e:
             glog(f"⚠️ 이전 기간 버튼 클릭 실패: {e}", "error")
 
-        # ── Step 2: 전날 확정 통계 (방문자/공감/댓글/이웃증감) ──
+        # ── Step 3: 전날 확정 통계 수집 (방문자/공감/댓글/이웃증감 + 조회수) ──
         visitors        = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[1]/ul/li[1]/a/div/div/strong")
         hearts          = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[1]/ul/li[2]/a/div/div/strong")
         comments        = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[2]/ul/li[1]/a/div/div/strong")
         neighbor_change = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[2]/ul/li[2]/a/div/div/strong")
+        views           = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[2]/div/div[2]/div[2]/div/ul/li/span")
 
         if visitors        is not None: result["visitors"]        = visitors
         if hearts          is not None: result["hearts"]          = hearts
         if comments        is not None: result["comments"]        = comments
         if neighbor_change is not None: result["neighbor_change"] = neighbor_change
-
-        # ── Step 3: 방문횟수 탭 클릭 → 이전 기간 버튼 다시 클릭 → 조회수 수집 ──
-        # (탭 전환 시 날짜가 오늘로 리셋될 수 있으므로 이전 기간 버튼 재클릭 필요)
-        views = None
-        try:
-            views_tab = driver.find_element(By.XPATH,
-                "/html/body/div/div/div[2]/div/div[1]/div[2]/div/div[1]/div/nav/div/ul/li[2]/a/span")
-            views_tab.click()
-            time.sleep(2)
-            # 탭 전환 후 이전 기간 버튼 재클릭
-            try:
-                prev_btn2 = driver.find_element(By.XPATH,
-                    "/html/body/div/div/div[2]/header/div/div[4]/div/div/div/div/a/span")
-                prev_btn2.click()
-                time.sleep(2)
-            except Exception:
-                pass
-            views = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[2]/div/div[2]/div[2]/div/ul/li/span")
-            if views is not None: result["views"] = views
-        except Exception as e:
-            glog(f"⚠️ 방문횟수 탭 수집 실패: {e}", "error")
+        if views           is not None: result["views"]           = views
 
         nc_str = f"{neighbor_change:+d}" if neighbor_change is not None else "?"
         glog(f"📊 전날 방문자:{visitors}  조회수:{views}  공감:{hearts}  댓글:{comments}  이웃증감:{nc_str}", "info")
