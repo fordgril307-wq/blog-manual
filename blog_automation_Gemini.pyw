@@ -612,7 +612,7 @@ _DASH_HTML = r"""<!DOCTYPE html>
       <span>블로그 현황</span>
       <span id="bstat-time" style="font-size:10px;color:var(--dim)"></span>
     </div>
-    <div style="font-size:11px;color:var(--dim);margin-bottom:6px;padding:0 2px">오늘</div>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:6px;padding:0 2px">어제</div>
     <div class="stat-grid" style="margin-bottom:12px">
       <div class="sb">
         <div class="si">🩷</div>
@@ -799,7 +799,7 @@ async function pollStats(){
       document.getElementById('bv').textContent=bt.visitors??'-';
       document.getElementById('bvw').textContent=bt.views??'-';
       document.getElementById('bnt').textContent=bt.neighbor_total??'-';
-      if(bt.updated_at) document.getElementById('bstat-time').textContent='전날 기준 '+bt.updated_at+' 수집';
+      if(bt.updated_at) document.getElementById('bstat-time').textContent='어제 기준 · '+bt.updated_at+' 수집';
     } else { bcard.style.display='none'; }
     const rl=document.getElementById('rlog');
     if(d.rest_log&&d.rest_log.length>0)
