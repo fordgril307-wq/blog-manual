@@ -1219,6 +1219,39 @@ class BlogDashboard:
 
         # 주기적 업데이트
         self.root.after(200, self._poll_queue)
+        # 저장된 설정 자동 불러오기
+        self.root.after(300, self._load_settings)
+
+    # ───────────────────────────────────────
+    SETTINGS_PATH = r"C:\blog\settings.json"
+
+    def _load_settings(self):
+        """저장된 설정 자동 불러오기"""
+        import json as _json
+        try:
+            with open(self.SETTINGS_PATH, encoding="utf-8") as f:
+                s = _json.load(f)
+            if s.get("tg_token"):
+                self.tg_token_var.set(s["tg_token"])
+            if s.get("tg_chat"):
+                self.tg_chat_var.set(s["tg_chat"])
+            if s.get("gh_token"):
+                self.gh_token_var.set(s["gh_token"])
+            self._log("✅ 저장된 설정을 불러왔어요.", "dim")
+        except FileNotFoundError:
+            pass  # 첫 실행 — 파일 없으면 그냥 넘어감
+        except Exception as e:
+            self._log(f"⚠️ 설정 불러오기 실패: {e}", "dim")
+
+    def _save_settings(self, tg_token, tg_chat, gh_token):
+        """텔레그램·GitHub 토큰 저장 (다음 실행 시 자동 채우기)"""
+        import json as _json
+        try:
+            s = {"tg_token": tg_token, "tg_chat": tg_chat, "gh_token": gh_token}
+            with open(self.SETTINGS_PATH, "w", encoding="utf-8") as f:
+                _json.dump(s, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            self._log(f"⚠️ 설정 저장 실패: {e}", "dim")
 
     # ───────────────────────────────────────
     def _toggle_mode(self):
@@ -1320,8 +1353,12 @@ class BlogDashboard:
             prem_min = int(self.prem_min_var.get().strip())
         except ValueError:
             prem_min = 100
+        gh_token = self.gh_token_var.get().strip()
+        # 토큰 저장 (다음 실행 시 자동 채우기)
+        self._save_settings(tg_token, tg_chat, gh_token)
+
         cfg = {"api_key": api_key, "tg_token": tg_token, "tg_chat": tg_chat,
-               "gh_token": self.gh_token_var.get().strip(),
+               "gh_token": gh_token,
                "mode": self.mode_var.get(),
                "add_neighbor": self.add_neighbor_var.get(),
                "neighbor_msg": self.neighbor_msg_text.get("1.0", tk.END).strip() if self.add_neighbor_var.get() else "",
