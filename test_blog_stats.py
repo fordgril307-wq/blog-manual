@@ -56,13 +56,13 @@ def fetch_blog_daily_stats(driver):
         except Exception as e:
             print(f"  ❌ 탭 클릭 실패: {e}")
 
-        # Step 2: 이전 기간 버튼 클릭
+        # Step 2: 이전 기간 버튼 클릭 (JS로 부모 <a> 직접 클릭)
         print("\n[Step 2] 이전 기간 조회 버튼 클릭...")
         try:
             btn = driver.find_element(By.XPATH,
-                "/html/body/div/div/div[2]/header/div/div[4]/div/div/div/div/a/span")
+                "/html/body/div/div/div[2]/header/div/div[4]/div/div/div/div/a")
             print(f"  버튼 텍스트: '{btn.text}'")
-            btn.click()
+            driver.execute_script("arguments[0].click();", btn)
             time.sleep(2)
             print("  ✅ 클릭 완료")
         except Exception as e:
