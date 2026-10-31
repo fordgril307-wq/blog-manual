@@ -954,13 +954,26 @@ class BlogDashboard:
                  highlightthickness=1, highlightbackground="#D0DDD0"
                  ).pack(fill=tk.X, padx=14, pady=(2, 6), ipady=5)
 
-        tk.Label(c1, text="Gemini API 키", font=F_SMALL,
-                 bg="#FFFFFF", fg="#555").pack(anchor="w", padx=14)
-        self.api_text = tk.Text(c1, font=("Courier", 8), height=1,
+        api_gh_row = tk.Frame(c1, bg="#FFFFFF")
+        api_gh_row.pack(fill=tk.X, padx=14, pady=(2, 8))
+        api_left = tk.Frame(api_gh_row, bg="#FFFFFF")
+        api_left.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
+        tk.Label(api_left, text="Gemini API 키", font=F_SMALL,
+                 bg="#FFFFFF", fg="#555").pack(anchor="w")
+        self.api_text = tk.Text(api_left, font=("Courier", 8), height=1,
                                 bg="#F7FAF7", relief=tk.FLAT, bd=0,
                                 highlightthickness=1, highlightbackground="#D0DDD0")
         self.api_text.insert("1.0", "AQ.Ab8RN6K8NupguNFf5N7oEb_kAYR8Ru3i-awbPjIMTYUwJW710g")
-        self.api_text.pack(fill=tk.X, padx=14, pady=(2, 8), ipady=4)
+        self.api_text.pack(fill=tk.X, ipady=4)
+        api_right = tk.Frame(api_gh_row, bg="#FFFFFF")
+        api_right.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        tk.Label(api_right, text="GitHub 토큰 (선택)", font=F_SMALL,
+                 bg="#FFFFFF", fg="#555").pack(anchor="w")
+        self.gh_token_var = tk.StringVar(value="")
+        tk.Entry(api_right, textvariable=self.gh_token_var, show="*", font=("Courier", 8),
+                 bg="#F7FAF7", relief=tk.FLAT, bd=0,
+                 highlightthickness=1, highlightbackground="#D0DDD0"
+                 ).pack(fill=tk.X, ipady=5)
 
         tg_row = tk.Frame(c1, bg="#FFFFFF")
         tg_row.pack(fill=tk.X, padx=14, pady=(2, 12))
@@ -981,17 +994,6 @@ class BlogDashboard:
                  bg="#FFFFFF", fg="#555").pack(anchor="w")
         self.tg_chat_var = tk.StringVar(value="")
         tk.Entry(tg_right, textvariable=self.tg_chat_var, font=F_LABEL,
-                 bg="#F7FAF7", relief=tk.FLAT, bd=0,
-                 highlightthickness=1, highlightbackground="#D0DDD0"
-                 ).pack(fill=tk.X, ipady=5)
-
-        # GitHub 토큰 행
-        gh_row = tk.Frame(c1, bg="#FFFFFF")
-        gh_row.pack(fill=tk.X, padx=14, pady=(0, 12))
-        tk.Label(gh_row, text="GitHub 토큰 (ngrok URL 자동 업로드 · 선택)", font=F_SMALL,
-                 bg="#FFFFFF", fg="#555").pack(anchor="w")
-        self.gh_token_var = tk.StringVar(value="")
-        tk.Entry(gh_row, textvariable=self.gh_token_var, show="*", font=("Courier", 8),
                  bg="#F7FAF7", relief=tk.FLAT, bd=0,
                  highlightthickness=1, highlightbackground="#D0DDD0"
                  ).pack(fill=tk.X, ipady=5)
