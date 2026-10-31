@@ -363,8 +363,8 @@ def _fetch_blog_daily_stats(driver):
         # ── Step 2: '이전 기간 조회' 버튼 한 번 클릭 → 전날 데이터로 전환 ──
         try:
             prev_btn = driver.find_element(By.XPATH,
-                "/html/body/div/div/div[2]/header/div/div[4]/div/div/div/div/a/span")
-            prev_btn.click()
+                "/html/body/div/div/div[2]/header/div/div[4]/div/div/div/div/a")
+            driver.execute_script("arguments[0].click();", prev_btn)
             time.sleep(2)
         except Exception as e:
             glog(f"⚠️ 이전 기간 버튼 클릭 실패: {e}", "error")
