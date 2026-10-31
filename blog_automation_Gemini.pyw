@@ -26,6 +26,17 @@ from urllib.parse import quote
 gemini_model = None
 shared_driver = None   # 재사용 가능한 전역 드라이버
 _worker_cfg   = {}     # 현재 작업 설정 (add_neighbor, neighbor_msg 등)
+_dashboard_log = None  # BlogDashboard._log 참조 (대시보드 스레드에서 UI 로그용)
+
+def _uiprint(msg, tag="info"):
+    """print() 대신 tkinter 로그창에 찍기. _dashboard_log 미설정시 print() 폴백."""
+    if _dashboard_log:
+        try:
+            _dashboard_log(msg, tag)
+            return
+        except Exception:
+            pass
+    print(msg)
 
 # 미발송 보고서 파일 (드라이버 죽어도 다음 시작 때 발송)
 _PENDING_REPORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".pending_report.json")
@@ -681,9 +692,9 @@ def _ngrok_start():
             if url:
                 return url
     except FileNotFoundError:
-        print("[대시보드] ngrok 없음 — 로컬에서만 접속 가능")
+        _uiprint("[대시보드] ngrok 없음 — 로컬에서만 접속 가능")
     except Exception as e:
-        print(f"[대시보드] ngrok 오류: {e}")
+        _uiprint(f"[대시보드] ngrok 오류: {e}")
     return None
 
 def _start_web_dashboard():
@@ -700,7 +711,7 @@ def _start_web_dashboard():
         _time.sleep(1)  # Flask 바인딩 대기
         pub_url = _ngrok_start()
         if pub_url:
-            print(f"[대시보드] 외부 접속: {pub_url}")
+            _uiprint(f"[대시보드] 외부 접속: {pub_url}")
             # GitHub에 ngrok 주소 저장 (콜라보 보드에서 fetch용)
             def _push_ngrok_url(url):
                 try:
@@ -711,6 +722,9 @@ def _start_web_dashboard():
                             break
                         _time.sleep(0.5)
                     _gh_token = _GH_TOKEN
+                    if not _gh_token:
+                        _uiprint("[대시보드] GitHub 토큰 없음 — ngrok_url.txt 업로드 건너뜀")
+                        return
                     _repo = "fordgril307-wq/blog-manual"
                     _path = "ngrok_url.txt"
                     _api = f"https://api.github.com/repos/{_repo}/contents/{_path}"
@@ -731,11 +745,11 @@ def _start_web_dashboard():
                     _body = {"message": "update ngrok url", "content": _b64.b64encode(url.encode()).decode()}
                     if _sha:
                         _body["sha"] = _sha
-                    _req2 = urllib.request.Request(_api, data=_json2.dumps(_body).encode(), headers=_headers, method="PUT")
-                    urllib.request.urlopen(_req2, timeout=5)
-                    print(f"[대시보드] GitHub ngrok_url.txt 업데이트 완료")
+                    _req2 = _ur2.Request(_api, data=_json2.dumps(_body).encode(), headers=_headers, method="PUT")
+                    _ur2.urlopen(_req2, timeout=5)
+                    _uiprint("[대시보드] GitHub ngrok_url.txt 업데이트 완료")
                 except Exception as _e:
-                    print(f"[대시보드] GitHub 업데이트 실패: {_e}")
+                    _uiprint(f"[대시보드] GitHub 업데이트 실패: {_e}")
             _wt.Thread(target=_push_ngrok_url, args=(pub_url,), daemon=True, name="GhPush").start()
             # 텔레그램 토큰이 아직 주입 전일 수 있으므로 최대 10초 대기
             for _ in range(20):
@@ -749,7 +763,7 @@ def _start_web_dashboard():
                 local_ip = _sock.gethostbyname(_sock.gethostname())
             except Exception:
                 local_ip = "localhost"
-            print(f"[대시보드] 로컬 접속: http://{local_ip}:5001")
+            _uiprint(f"[대시보드] 로컬 접속: http://{local_ip}:5001")
     _wt.Thread(target=_notify, daemon=True, name="NgrokNotify").start()
     # Flask 뜨면 브라우저 자동 열기
     def _open_browser():
@@ -1240,6 +1254,10 @@ class BlogDashboard:
 
         self._log("━━━  블로그 자동화 대시보드 시작  ━━━", "header")
         self._log("설정을 입력하고 시작 버튼을 누르세요.", "dim")
+
+        # 전역 로그 함수 연결 (대시보드 스레드에서 UI 로그 찍기용)
+        global _dashboard_log
+        _dashboard_log = self._log
 
         # 주기적 업데이트
         self.root.after(200, self._poll_queue)
