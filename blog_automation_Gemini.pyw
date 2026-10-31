@@ -960,11 +960,11 @@ class BlogDashboard:
         api_left.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
         tk.Label(api_left, text="Gemini API 키", font=F_SMALL,
                  bg="#FFFFFF", fg="#555").pack(anchor="w")
-        self.api_text = tk.Text(api_left, font=("Courier", 8), height=1,
-                                bg="#F7FAF7", relief=tk.FLAT, bd=0,
-                                highlightthickness=1, highlightbackground="#D0DDD0")
-        self.api_text.insert("1.0", "AQ.Ab8RN6K8NupguNFf5N7oEb_kAYR8Ru3i-awbPjIMTYUwJW710g")
-        self.api_text.pack(fill=tk.X, ipady=4)
+        self.api_var = tk.StringVar(value="AQ.Ab8RN6K8NupguNFf5N7oEb_kAYR8Ru3i-awbPjIMTYUwJW710g")
+        self.api_text = tk.Entry(api_left, textvariable=self.api_var, font=("Courier", 8),
+                                 show="*", bg="#F7FAF7", relief=tk.FLAT, bd=0,
+                                 highlightthickness=1, highlightbackground="#D0DDD0")
+        self.api_text.pack(fill=tk.X, ipady=5)
         api_right = tk.Frame(api_gh_row, bg="#FFFFFF")
         api_right.pack(side=tk.LEFT, fill=tk.X, expand=True)
         tk.Label(api_right, text="GitHub 토큰 (선택)", font=F_SMALL,
@@ -1340,7 +1340,7 @@ class BlogDashboard:
             messagebox.showerror("오류", "비밀번호가 틀렸습니다!")
             return
 
-        api_key = self.api_text.get("1.0", tk.END).strip()
+        api_key = self.api_var.get().strip()
         if not api_key:
             messagebox.showerror("오류", "Gemini API 키를 입력해주세요!")
             return
