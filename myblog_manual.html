@@ -380,8 +380,21 @@
     <div class="step">
       <div class="step-num">2</div>
       <div class="step-body">
-        <strong>파일 준비</strong>
-        <p><code>myblog_auto.py</code> 파일을 원하는 폴더에 저장합니다. (예: <code>C:\blog\myblog_auto.py</code>)</p>
+        <strong>파일 준비 및 실행 (배치 파일 이용)</strong>
+        <p><code>blog_automation_Gemini.pyw</code>를 다운로드해 <code>C:\blog\</code> 폴더에 저장합니다. 아래 배치 파일(<code>start.bat</code>)을 만들어 두면 다음번에 새 파일을 다운로드했을 때도 한 번에 복사·실행할 수 있습니다.</p>
+        <div class="code-block">@echo off
+chcp 65001 &gt;nul
+copy /Y "C:\Users\김혜수\Downloads\blog_automation_Gemini.pyw" "C:\blog\blog_automation_Gemini.pyw"
+cd /d C:\blog
+start pythonw.exe blog_automation_Gemini.pyw
+exit</div>
+        <div class="tip" style="margin-top:10px">
+          <span class="tip-icon">💡</span>
+          <div>
+            <strong>배치 파일 사용 순서</strong><br>
+            새 버전을 받으면 → <strong>다운로드 폴더에 저장</strong> → <code>start.bat</code> 더블클릭 → 자동으로 <code>C:\blog\</code>에 복사되고 실행됩니다.
+          </div>
+        </div>
       </div>
     </div>
     <div class="step">
