@@ -642,31 +642,44 @@ def _web_ctrl_watcher(dashboard_instance):
 
 def _ngrok_start():
     """ngrok으로 5001 포트를 외부에 노출하고 공개 URL을 반환.
-    ngrok이 없으면 None 반환 (조용히 실패).
+    이미 실행 중이면 URL만 가져옴. ngrok이 없으면 None 반환.
     """
     import subprocess as _ngp
     import time as _time
+    import urllib.request as _ur
+    import json as _j
+
+    def _get_url():
+        """4040 API에서 https URL 추출"""
+        try:
+            with _ur.urlopen("http://127.0.0.1:4040/api/tunnels", timeout=2) as r:
+                data = _j.loads(r.read())
+                for t in data.get("tunnels", []):
+                    url = t.get("public_url", "")
+                    if url.startswith("https://"):
+                        return url
+        except Exception:
+            pass
+        return None
+
+    # 이미 ngrok이 떠있으면 URL만 가져오기
+    existing = _get_url()
+    if existing:
+        return existing
+
+    # ngrok 새로 실행
     try:
         _ngp.Popen(
             ["ngrok", "http", "5001", "--log=stdout"],
             stdout=_ngp.DEVNULL, stderr=_ngp.DEVNULL,
             creationflags=getattr(_ngp, "CREATE_NO_WINDOW", 0)
         )
-        # ngrok API가 올라올 때까지 최대 6초 대기
-        import urllib.request as _ur
-        for _ in range(12):
+        # ngrok API가 올라올 때까지 최대 10초 대기
+        for _ in range(20):
             _time.sleep(0.5)
-            try:
-                with _ur.urlopen("http://127.0.0.1:4040/api/tunnels", timeout=1) as r:
-                    import json as _j
-                    data = _j.loads(r.read())
-                    tunnels = data.get("tunnels", [])
-                    for t in tunnels:
-                        url = t.get("public_url", "")
-                        if url.startswith("https://"):
-                            return url
-            except Exception:
-                continue
+            url = _get_url()
+            if url:
+                return url
     except FileNotFoundError:
         print("[대시보드] ngrok 없음 — 로컬에서만 접속 가능")
     except Exception as e:
@@ -692,7 +705,12 @@ def _start_web_dashboard():
             def _push_ngrok_url(url):
                 try:
                     import urllib.request as _ur2, json as _json2, base64 as _b64
-                    _gh_token = _GH_TOKEN  # 아래 설정값 사용
+                    # GH_TOKEN이 주입될 때까지 최대 120초 대기 (시작 버튼 누를 때 주입됨)
+                    for _ in range(240):
+                        if _GH_TOKEN:
+                            break
+                        _time.sleep(0.5)
+                    _gh_token = _GH_TOKEN
                     _repo = "fordgril307-wq/blog-manual"
                     _path = "ngrok_url.txt"
                     _api = f"https://api.github.com/repos/{_repo}/contents/{_path}"
@@ -704,8 +722,8 @@ def _start_web_dashboard():
                     # 기존 파일 SHA 조회 (업데이트용)
                     _sha = None
                     try:
-                        _req = urllib.request.Request(_api, headers=_headers)
-                        _res = urllib.request.urlopen(_req, timeout=5)
+                        _req = _ur2.Request(_api, headers=_headers)
+                        _res = _ur2.urlopen(_req, timeout=5)
                         _sha = _json2.loads(_res.read())["sha"]
                     except Exception:
                         pass
