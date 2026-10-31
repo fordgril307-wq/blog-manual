@@ -332,6 +332,7 @@
       <a href="#a1"><span class="toc-num" style="background:var(--warn-bg);color:var(--warn)">A</span> 부록 A — Gemini API 키 발급</a></li>
     <li><a href="#a2"><span class="toc-num" style="background:var(--warn-bg);color:var(--warn)">B</span> 부록 B — 텔레그램 봇 & Chat ID 발급</a></li>
     <li><a href="#a3"><span class="toc-num" style="background:var(--warn-bg);color:var(--warn)">C</span> 부록 C — 크롬 영구 로그인 설정</a></li>
+    <li><a href="#a4"><span class="toc-num" style="background:var(--warn-bg);color:var(--warn)">D</span> 부록 D — GitHub 토큰 발급 & 친구 공유</a></li>
   </ul>
 </nav>
 
@@ -349,6 +350,7 @@
         <tr><td><strong>myblog_auto.py</strong></td><td>자동화 스크립트 파일</td><td><span class="gui-tag">필수</span></td></tr>
         <tr><td><strong>Gemini API 키</strong></td><td>AI 댓글 생성용 (부록 A 참고)</td><td><span class="gui-tag">필수</span></td></tr>
         <tr><td><strong>텔레그램 봇 토큰</strong></td><td>알림 수신용 (부록 B 참고)</td><td><span class="gui-tag">필수</span></td></tr>
+        <tr><td><strong>GitHub 토큰</strong></td><td>자동업데이트용 — 없어도 동작, 있으면 업데이트 속도 향상 (부록 D 참고)</td><td>선택</td></tr>
         <tr><td><strong>네이버 계정</strong></td><td>블로그 활동할 계정</td><td><span class="gui-tag">필수</span></td></tr>
       </tbody>
     </table>
@@ -380,27 +382,17 @@
     <div class="step">
       <div class="step-num">2</div>
       <div class="step-body">
-        <strong>파일 준비 및 실행 (배치 파일 이용)</strong>
-        <p>아래 배치 파일(<code>블로그자동화.bat</code>)을 <code>C:\blog\</code>에 한 번만 저장해두세요. 이후로는 이 파일만 더블클릭하면 <strong>GitHub에서 최신 버전을 자동으로 받아와</strong> 바로 실행됩니다.</p>
+        <strong>바탕화면 바로가기(bat 파일)로 실행 — 자동업데이트 포함</strong>
+        <p>바탕화면의 <strong>블로그자동화.bat</strong> 파일을 더블클릭하면 됩니다. 매 실행 시 GitHub에서 최신 파일을 자동으로 내려받은 뒤 프로그램을 시작합니다.</p>
         <div class="code-block">@echo off
 chcp 65001 &gt;nul
-echo GitHub에서 최신 버전 다운로드 중...
-curl -fsSL -o "C:\blog\blog_automation_Gemini.pyw" "https://raw.githubusercontent.com/fordgril307-wq/blog-manual/main/blog_automation_Gemini.pyw"
-if errorlevel 1 (
-    echo [경고] 다운로드 실패 - 기존 파일로 실행합니다.
-) else (
-    echo 업데이트 완료!
-)
 cd /d C:\blog
+<span class="hl">curl -s -o blog_automation_Gemini.pyw "https://raw.githubusercontent.com/fordgril307-wq/blog-manual/main/blog_automation_Gemini.pyw?t=..."</span>
 start pythonw.exe blog_automation_Gemini.pyw
 exit</div>
-        <div class="tip" style="margin-top:10px">
-          <span class="tip-icon">💡</span>
-          <div>
-            <strong>처음 설치할 때 한 번만</strong> — <code>C:\blog\</code> 폴더를 만들고 이 bat 파일을 그 안에 저장하세요.<br>
-            그 다음부터는 <code>블로그자동화.bat</code> 더블클릭 한 번으로 항상 최신 버전이 실행됩니다.<br>
-            인터넷이 안 되는 환경에서도 기존 파일로 자동 fallback됩니다.
-          </div>
+        <div class="tip" style="margin-top:8px">
+          <span class="tip-icon">⚡</span>
+          <div><strong>bat 파일로 실행하기만 하면 항상 최신 버전</strong>이 유지됩니다. 별도로 파일을 다운받거나 업데이트할 필요가 없습니다.</div>
         </div>
       </div>
     </div>
@@ -462,17 +454,23 @@ python myblog_auto.py</div>
                 <span class="gui-label">비밀번호</span>
                 <span class="gui-input">••••••••••••</span>
               </div>
-              <div class="gui-row">
-                <span class="gui-label">Gemini API</span>
-                <span class="gui-input">AIzaSy...</span>
+              <div class="gui-row" style="gap:6px; padding:4px 10px;">
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; color:var(--fg3); margin-bottom:2px;">Gemini API 키</div>
+                  <span class="gui-input" style="display:block">AIzaSy... ••••</span>
+                </div>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; color:var(--fg3); margin-bottom:2px;">GitHub 토큰 (선택)</div>
+                  <span class="gui-input" style="display:block">ghp_••••••</span>
+                </div>
               </div>
               <div class="gui-row" style="gap:6px; padding:4px 10px;">
                 <div style="flex:1; min-width:0;">
-                  <div style="font-size:10px; color:var(--fg3); margin-bottom:2px;">TG 봇 토큰</div>
+                  <div style="font-size:10px; color:var(--fg3); margin-bottom:2px;">텔레그램 봇 토큰</div>
                   <span class="gui-input" style="display:block">123456:ABC...</span>
                 </div>
-                <div style="flex:0 0 90px; min-width:0;">
-                  <div style="font-size:10px; color:var(--fg3); margin-bottom:2px;">TG Chat ID</div>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; color:var(--fg3); margin-bottom:2px;">텔레그램 채팅 ID</div>
                   <span class="gui-input" style="display:block">-100123456</span>
                 </div>
               </div>
@@ -484,7 +482,7 @@ python myblog_auto.py</div>
         </div>
         <div class="tip" style="margin-top:8px">
           <span class="tip-icon">💡</span>
-          <div><strong>텔레그램 봇 토큰</strong>과 <strong>Chat ID</strong>는 같은 줄에 나란히 입력합니다. 발급 방법은 부록 B를 참고하세요.</div>
+          <div><strong>텔레그램 봇 토큰 · Chat ID</strong>는 나란히 입력합니다 (부록 B 참고). <strong>GitHub 토큰</strong>은 선택 항목이며 비워도 됩니다 (부록 D 참고). 입력한 값은 자동으로 저장되어 다음 실행 때 자동으로 불러와집니다.</div>
         </div>
       </div>
     </div>
@@ -831,6 +829,22 @@ python myblog_auto.py</div>
         <p>작업이 끝나면 텔레그램으로 상세 보고서가 전송됩니다. Overview에는 <strong>공감 수 · 댓글 수 · 이웃 수</strong>가 함께 표시됩니다.</p>
       </div>
     </div>
+    <div class="step">
+      <div class="step-num">9</div>
+      <div class="step-body">
+        <strong>콜라보 보드 자동 업데이트</strong>
+        <p>세션 종료 시점에 블로그 통계와 ngrok URL이 <strong>콜라보 보드</strong>로 자동 push됩니다.</p>
+        <ul>
+          <li><strong>블로그 통계 push</strong>: 공감 수, 댓글 수, 이웃 수, 방문자 수 등이 오늘 날짜 키로 보드 DB에 기록됩니다.</li>
+          <li><strong>ngrok URL push</strong>: 실행 시작 시 발급된 ngrok 주소가 보드에 자동 등록됩니다 — 외부에서 대시보드 접속 주소를 확인할 수 있습니다.</li>
+          <li>Selenium으로 보드 탭을 직접 열어 JS 함수(<code>cbBlogStats</code>, <code>cbSetNgrok</code>)를 호출하는 방식이므로 별도 설정이 필요 없습니다.</li>
+        </ul>
+        <div class="tip" style="margin-top:8px">
+          <span class="tip-icon">📊</span>
+          <div>콜라보 보드는 <strong>blog_automation_Gemini.pyw가 직접</strong> 처리합니다 — collabo_daily.pyw와 완전히 분리되어 있으며, 두 프로그램은 서로 독립적으로 동작합니다.</div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -868,6 +882,14 @@ python myblog_auto.py</div>
     <p style="margin-top:6px">중지 신호는 현재 작업(댓글 입력 등)이 완료된 직후 반영됩니다. 길어도 한 사이클(몇 초~수십 초) 내에 멈춥니다. 재시도 루프 중에도 중간에 신호를 감지해 즉시 종료합니다.</p>
   </div>
   <div class="card">
+    <strong>Q. 텔레그램/GitHub 토큰을 매번 다시 입력해야 하나요?</strong>
+    <p style="margin-top:6px">아니요. <strong>자동화 시작</strong> 버튼을 누를 때마다 입력된 텔레그램 봇 토큰, Chat ID, GitHub 토큰이 <code>C:\blog\settings.json</code>에 자동으로 저장됩니다. 다음에 프로그램을 열면 300ms 후 자동으로 불러와집니다. Gemini API 키는 기본값이 있어 별도로 저장되지 않습니다.</p>
+  </div>
+  <div class="card">
+    <strong>Q. 친구에게 이 프로그램을 공유하고 싶어요.</strong>
+    <p style="margin-top:6px">친구가 <strong>같은 bat 파일을 받아서 실행하면 됩니다.</strong> bat 파일을 실행하면 자동으로 최신 파일을 GitHub에서 내려받아 시작합니다. 친구는 프로그램 창에서 본인의 텔레그램 봇 토큰과 Chat ID를 직접 입력하면 됩니다 — 입력 값은 <em>친구 PC의</em> <code>C:\blog\settings.json</code>에 따로 저장되므로 서로 섞이지 않습니다. 자세한 공유 방법은 <a href="#a4">부록 D</a>를 참고하세요.</p>
+  </div>
+  <div class="card">
     <strong>Q. .pyw 파일을 더블클릭해도 아무 반응이 없습니다.</strong>
     <p style="margin-top:6px">Windows에서 <code>.pyw</code> 파일이 <code>pythonw.exe</code>와 연결되지 않은 경우입니다. <strong>관리자 권한</strong>으로 명령 프롬프트(CMD)를 열고 아래 명령어를 순서대로 입력하세요.</p>
     <div class="code-block" style="margin-top:8px">assoc .pyw=Python.NoConFile
@@ -879,11 +901,6 @@ ftype Python.NoConFile="C:\Users\<사용자명>\AppData\Local\Programs\Python\Py
     <strong>Q. 실행하면 브라우저가 자동으로 열리나요?</strong>
     <p style="margin-top:6px">네, <code>.pyw</code> 더블클릭이나 배치파일(start.bat) 실행 시 Flask 서버가 준비되면 자동으로 기본 브라우저가 열리며 대시보드(<code>http://127.0.0.1:5001</code>)가 표시됩니다.</p>
     <p style="margin-top:6px; font-size:13px; color:var(--fg2)">서버 시작까지 최대 15초가 걸릴 수 있습니다. 브라우저가 자동으로 열리지 않으면 직접 주소창에 <code>http://127.0.0.1:5001</code>을 입력하세요.</p>
-  </div>
-  <div class="card">
-    <strong>Q. 콜라보 보드에 블로그 통계가 자동으로 올라가나요?</strong>
-    <p style="margin-top:6px">네. 자동화 실행이 끝나면 이번 주 공감·댓글·이웃 누적 통계가 콜라보 보드의 <strong>블로그 활동</strong> 탭에 자동으로 반영됩니다. 별도 조작 없이 <code>collabo_daily.pyw</code>가 백그라운드에서 실행되어 보드를 업데이트합니다.</p>
-    <p style="margin-top:6px; font-size:13px; color:var(--fg2)">통계 파일 위치: <code>C:\blog\.weekly_stats.json</code> — 매 실행 결과가 주차별로 누적 저장됩니다.</p>
   </div>
 </section>
 
@@ -1113,6 +1130,104 @@ ftype Python.NoConFile="C:\Users\<사용자명>\AppData\Local\Programs\Python\Py
   <p style="font-size:13px; color:var(--fg3); margin-top:8px">※ <code>C:\ChromeBot</code> 또는 <code>/Users/나/ChromeBot</code> 폴더는 처음 실행 시 자동으로 만들어집니다.</p>
 </div>
 
+<div class="appendix" id="a4">
+  <div class="appendix-header">📎 부록 D</div>
+  <h2>GitHub 토큰 발급 & 친구 공유 방법</h2>
+  <p style="color:var(--fg2); margin-bottom:20px; font-size:14px">GitHub 토큰은 선택 항목입니다. 없어도 자동업데이트는 동작하지만, 토큰을 입력하면 GitHub 요청 한도가 늘어나 더 안정적으로 업데이트됩니다. 친구에게 공유할 때도 이 부록을 참고하세요.</p>
+
+  <h3 class="sub-title" style="margin-top:0">GitHub 토큰 발급 (선택)</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>GitHub 접속 및 로그인</strong>
+        <p><a href="https://github.com" target="_blank">github.com</a>에서 로그인합니다. 계정이 없으면 무료로 가입하세요.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Settings → Developer settings 이동</strong>
+        <p>우측 상단 프로필 아이콘 클릭 → <strong>Settings</strong> → 왼쪽 맨 아래 <strong>Developer settings</strong> 클릭</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Personal access tokens → Tokens (classic)</strong>
+        <p><strong>Generate new token → Generate new token (classic)</strong>을 선택합니다.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <strong>토큰 설정</strong>
+        <ul style="margin-top:6px">
+          <li><strong>Note</strong>: 토큰 이름 입력 (예: <code>blog-auto</code>)</li>
+          <li><strong>Expiration</strong>: 원하는 만료 기간 (또는 No expiration)</li>
+          <li><strong>Scopes</strong>: <code>public_repo</code> 체크만 하면 충분합니다</li>
+        </ul>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <strong>Generate token 클릭 후 복사</strong>
+        <p><code>ghp_</code>로 시작하는 토큰이 생성됩니다. <strong>이 페이지를 벗어나면 다시 볼 수 없으므로</strong> 반드시 복사해두세요.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <strong>대시보드 GitHub 토큰 칸에 붙여넣기</strong>
+        <p>프로그램 실행 후 인증 카드의 <strong>GitHub 토큰 (선택)</strong> 입력란에 붙여넣습니다. 자동화 시작 버튼을 누르면 자동 저장됩니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn-box" style="margin-top:16px">
+    <span style="font-size:18px; flex-shrink:0">🔒</span>
+    <div>GitHub 토큰은 절대 다른 사람과 공유하지 마세요. <code>C:\blog\settings.json</code>에 저장되므로 본인 PC에서만 사용됩니다.</div>
+  </div>
+
+  <h3 class="sub-title">친구에게 공유하는 방법</h3>
+  <p style="color:var(--fg2); font-size:14px; margin-bottom:16px">같은 파일을 친구가 받아서 써도 됩니다. 각자의 설정(텔레그램 토큰, Chat ID)은 각자 PC에 따로 저장되므로 서로 섞이지 않습니다.</p>
+
+  <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px">
+    <div class="card" style="flex:1; min-width:200px; border-top:3px solid var(--accent)">
+      <strong>① bat 파일 전달</strong>
+      <p style="margin-top:6px">바탕화면의 <code>블로그자동화.bat</code> 파일을 친구에게 보내주세요. 카카오톡, 이메일 등 어떤 방법으로도 괜찮습니다.</p>
+    </div>
+    <div class="card" style="flex:1; min-width:200px; border-top:3px solid var(--accent)">
+      <strong>② 친구 PC에서 실행</strong>
+      <p style="margin-top:6px">친구가 bat 파일을 <code>C:\blog\</code> 폴더에 넣고 더블클릭하면 자동으로 최신 파일이 설치됩니다. Python이 설치되어 있어야 합니다.</p>
+    </div>
+    <div class="card" style="flex:1; min-width:200px; border-top:3px solid var(--accent)">
+      <strong>③ 친구 각자 설정 입력</strong>
+      <p style="margin-top:6px">친구가 본인의 텔레그램 봇 토큰과 Chat ID를 직접 입력합니다. <strong>자동화 시작</strong> 버튼을 누르면 친구 PC의 settings.json에 저장됩니다.</p>
+    </div>
+  </div>
+
+  <div class="tip">
+    <span class="tip-icon">👥</span>
+    <div><strong>나의 텔레그램 토큰은 공유하지 않아도 됩니다.</strong> 친구가 본인 텔레그램 계정으로 새 봇을 만들면 각자 알림을 받을 수 있습니다. 봇 만드는 방법은 <a href="#a2">부록 B</a>를 참고하세요.</div>
+  </div>
+
+  <h3 class="sub-title">친구에게 필요한 사전 준비</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>항목</th><th>방법</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Python 설치</strong></td><td>python.org에서 설치 (Add to PATH 체크 필수)</td></tr>
+        <tr><td><strong>패키지 설치</strong></td><td>CMD에서 <code>pip install selenium webdriver-manager google-genai requests flask pillow</code></td></tr>
+        <tr><td><strong>크롬 영구 로그인</strong></td><td><a href="#a3">부록 C</a> 참고</td></tr>
+        <tr><td><strong>텔레그램 봇 발급</strong></td><td><a href="#a2">부록 B</a> 참고 — 친구 본인 계정으로 새 봇 생성</td></tr>
+        <tr><td><strong>Gemini API 키</strong></td><td>프로그램에 기본 키가 내장되어 있어 바로 사용 가능 (필요시 <a href="#a1">부록 A</a> 참고)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <footer class="footer">
   블로그 자동화 매뉴얼 v3.6 · 문의: 관리자에게 연락하세요
 </footer>
@@ -1152,6 +1267,7 @@ ftype Python.NoConFile="C:\Users\<사용자명>\AppData\Local\Programs\Python\Py
     { id: 'a1', label: 'A. Gemini키' },
     { id: 'a2', label: 'B. 텔레그램' },
     { id: 'a3', label: 'C. 크롬 로그인' },
+    { id: 'a4', label: 'D. GitHub·공유' },
   ];
 
   var nav      = document.getElementById('sec-nav');

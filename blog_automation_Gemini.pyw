@@ -220,6 +220,111 @@ def _weekly_add(hearts, comments, neighbors, visitors=None, neighbor_total=None,
     _weekly_save(data)
 
 
+# =============================================
+# 콜라보 보드 직접 push (blog_automation 전용)
+# =============================================
+_COLLABO_BOARD_URL = "https://claude.ai/artifact/157Ly54Be85vAKoMSwiJkN"
+_last_ngrok_url    = None   # 현재 세션 ngrok URL 캐시
+
+def _push_blog_stats_to_board(blog_stats, hearts, comments, neighbors):
+    """블로그 통계를 콜라보 보드에 Selenium으로 직접 push."""
+    import json as _j
+    try:
+        if not shared_driver:
+            glog("⚠️ 콜라보 보드 push 불가 — 드라이버 없음", "error")
+            return
+        today = time.strftime("%Y-%m-%d")
+        row = {
+            "date":           today,
+            "hearts":         hearts,
+            "comments":       comments,
+            "neighbors":      neighbors,
+            "visitors":       blog_stats.get("visitors"),
+            "neighbor_total": blog_stats.get("neighbor_total"),
+            "new_comments":   blog_stats.get("new_comments"),
+            "new_hearts":     blog_stats.get("new_hearts"),
+        }
+        # None 값 제거 (JS 쪽에서 undefined 처리 맞게)
+        row = {k: v for k, v in row.items() if v is not None}
+
+        glog("📊 콜라보 보드 블로그 통계 push 중...", "info")
+        _board_js(f"cbBlogStats([{_j.dumps(row, ensure_ascii=False)}])")
+        glog(f"✅ 콜라보 보드 블로그 통계 push 완료 ({today})", "success")
+    except Exception as _e:
+        glog(f"⚠️ 콜라보 보드 통계 push 실패: {_e}", "error")
+
+
+def _push_ngrok_to_board(url=None):
+    """ngrok URL을 콜라보 보드에 Selenium으로 직접 push."""
+    import json as _j
+    global _last_ngrok_url
+    try:
+        if not shared_driver:
+            return
+        target = url or _last_ngrok_url
+        if not target:
+            return
+        glog("🔗 콜라보 보드 ngrok URL push 중...", "info")
+        _board_js(f"cbSetNgrok({_j.dumps(target)})")
+        glog(f"✅ 콜라보 보드 ngrok URL push 완료", "success")
+    except Exception as _e:
+        glog(f"⚠️ 콜라보 보드 ngrok push 실패: {_e}", "error")
+
+
+def _board_js(js_call):
+    """콜라보 보드 페이지를 열고 JS 함수 호출 후 원래 탭으로 복귀."""
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    import json as _j
+
+    driver = shared_driver
+    original_handle = driver.current_window_handle
+    opened_new = False
+
+    try:
+        # 이미 보드 탭이 열려있는지 확인
+        board_handle = None
+        for h in driver.window_handles:
+            try:
+                driver.switch_to.window(h)
+                if _COLLABO_BOARD_URL.split("/")[-1] in driver.current_url:
+                    board_handle = h
+                    break
+            except Exception:
+                pass
+
+        if not board_handle:
+            # 새 탭에서 보드 열기
+            driver.execute_script(f"window.open('{_COLLABO_BOARD_URL}', '_blank');")
+            time.sleep(0.5)
+            board_handle = driver.window_handles[-1]
+            driver.switch_to.window(board_handle)
+            opened_new = True
+            # 페이지 로드 + cbBlogStats 함수 등장 대기 (최대 20초)
+            WebDriverWait(driver, 20).until(
+                lambda d: d.execute_script("return typeof window.cbBlogStats === 'function'")
+            )
+            time.sleep(1)
+        else:
+            driver.switch_to.window(board_handle)
+
+        # JS 함수 호출 및 결과 수집
+        result = driver.execute_script(f"return await {js_call};")
+
+    finally:
+        if opened_new:
+            try:
+                driver.close()
+            except Exception:
+                pass
+        try:
+            driver.switch_to.window(original_handle)
+        except Exception:
+            pass
+
+    return result
+
+
 def _fetch_blog_daily_stats(driver):
     """네이버 블로그 통계 API에서 오늘 방문자수·이웃수·새 공감·새 댓글을 가져온다."""
     import re as _re, json as _j
@@ -796,7 +901,20 @@ def _start_web_dashboard():
         pub_url = _ngrok_start()
         if pub_url:
             _uiprint(f"[대시보드] 외부 접속: {pub_url}")
-            # GitHub에 ngrok 주소 저장 (콜라보 보드에서 fetch용)
+            # ngrok URL 전역 캐시 저장 (세션 종료 시 콜라보 보드 push용)
+            global _last_ngrok_url
+            _last_ngrok_url = pub_url
+            # 콜라보 보드에 ngrok URL 즉시 push (드라이버가 준비되면)
+            def _board_ngrok_push(url):
+                import time as _time2
+                for _ in range(60):  # 최대 30초 드라이버 대기
+                    if shared_driver:
+                        break
+                    _time2.sleep(0.5)
+                if shared_driver:
+                    _push_ngrok_to_board(url)
+            _wt.Thread(target=_board_ngrok_push, args=(pub_url,), daemon=True, name="BoardNgrok").start()
+            # GitHub에 ngrok 주소 저장 (백업용)
             def _push_ngrok_url(url):
                 try:
                     import urllib.request as _ur2, json as _json2, base64 as _b64
@@ -1969,17 +2087,11 @@ Details
                 new_comments=_blog_stats.get("new_comments"),
                 new_hearts=_blog_stats.get("new_hearts"))
 
-    # 블로그 통계 → 콜라보 보드 push
-    try:
-        import subprocess as _subp
-        _collabo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "collabo", "collabo_daily.pyw")
-        if os.path.exists(_collabo):
-            _subp.Popen([sys.executable, _collabo], creationflags=0x08000000)  # CREATE_NO_WINDOW
-            glog("📊 콜라보 보드 통계 업데이트 중...", "info")
-        else:
-            glog(f"⚠️ collabo_daily.pyw 없음: {_collabo}", "error")
-    except Exception as _e:
-        glog(f"⚠️ 콜라보 보드 push 실패: {_e}", "error")
+    # 블로그 통계 → 콜라보 보드 직접 push (Selenium)
+    _push_blog_stats_to_board(_blog_stats, hearts, comments, neighbors)
+
+    # ngrok URL → 콜라보 보드 직접 push (Selenium)
+    _push_ngrok_to_board()
 
 def glog(msg, tag="info"):
     log_queue.put(("log", msg, tag))
