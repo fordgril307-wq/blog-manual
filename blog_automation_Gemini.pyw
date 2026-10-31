@@ -688,6 +688,37 @@ def _start_web_dashboard():
         pub_url = _ngrok_start()
         if pub_url:
             print(f"[대시보드] 외부 접속: {pub_url}")
+            # GitHub에 ngrok 주소 저장 (콜라보 보드에서 fetch용)
+            def _push_ngrok_url(url):
+                try:
+                    import urllib.request as _ur2, json as _json2, base64 as _b64
+                    _gh_token = _GH_TOKEN  # 아래 설정값 사용
+                    _repo = "fordgril307-wq/blog-manual"
+                    _path = "ngrok_url.txt"
+                    _api = f"https://api.github.com/repos/{_repo}/contents/{_path}"
+                    _headers = {
+                        "Authorization": f"token {_gh_token}",
+                        "Content-Type": "application/json",
+                        "User-Agent": "blog-automation"
+                    }
+                    # 기존 파일 SHA 조회 (업데이트용)
+                    _sha = None
+                    try:
+                        _req = urllib.request.Request(_api, headers=_headers)
+                        _res = urllib.request.urlopen(_req, timeout=5)
+                        _sha = _json2.loads(_res.read())["sha"]
+                    except Exception:
+                        pass
+                    # 파일 내용 업데이트
+                    _body = {"message": "update ngrok url", "content": _b64.b64encode(url.encode()).decode()}
+                    if _sha:
+                        _body["sha"] = _sha
+                    _req2 = urllib.request.Request(_api, data=_json2.dumps(_body).encode(), headers=_headers, method="PUT")
+                    urllib.request.urlopen(_req2, timeout=5)
+                    print(f"[대시보드] GitHub ngrok_url.txt 업데이트 완료")
+                except Exception as _e:
+                    print(f"[대시보드] GitHub 업데이트 실패: {_e}")
+            _wt.Thread(target=_push_ngrok_url, args=(pub_url,), daemon=True, name="GhPush").start()
             # 텔레그램 토큰이 아직 주입 전일 수 있으므로 최대 10초 대기
             for _ in range(20):
                 if _tg_token and _tg_chat:
@@ -1552,6 +1583,9 @@ Details
 # 텔레그램 설정 (런타임에 cfg에서 주입)
 _tg_token = ""
 _tg_chat  = ""
+
+# GitHub 설정 (ngrok URL 자동 업로드용) — 런타임에 cfg에서 주입
+_GH_TOKEN = ""
 
 def _tg_send(text):
     """텔레그램으로 메시지 발송 — 드라이버 없이 HTTP만으로 동작"""
@@ -2958,7 +2992,7 @@ def run_neighbor_mode(driver, start, end, feed_url):
 # 워커 스레드
 # =============================================
 def _run_worker(cfg):
-    global gemini_model, shared_driver, _tg_token, _tg_chat, _worker_cfg
+    global gemini_model, shared_driver, _tg_token, _tg_chat, _worker_cfg, _GH_TOKEN
 
     _session_start()   # 작업 시작 시간 기록
     _worker_cfg = cfg  # 전역 설정 공유 (visit_blog_and_interact에서 참조)
@@ -2966,6 +3000,9 @@ def _run_worker(cfg):
     # 텔레그램 설정 주입
     _tg_token = cfg.get('tg_token', '')
     _tg_chat  = cfg.get('tg_chat', '')
+
+    # GitHub 설정 주입 (ngrok URL 자동 업로드용)
+    _GH_TOKEN = cfg.get('gh_token', '')
 
     # 미발송 보고서 있으면 먼저 발송
     _send_pending_report_if_exists()
