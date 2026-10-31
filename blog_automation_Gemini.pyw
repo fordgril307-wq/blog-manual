@@ -202,7 +202,7 @@ def _weekly_save(data):
     except Exception:
         pass
 
-def _weekly_add(hearts, comments, neighbors):
+def _weekly_add(hearts, comments, neighbors, visitors=None, neighbor_total=None, new_comments=None, new_hearts=None):
     data = _weekly_load()
     today = time.strftime("%Y-%m-%d")
     week_key = time.strftime("%Y-W%W")
@@ -212,8 +212,92 @@ def _weekly_add(hearts, comments, neighbors):
     day["hearts"]    += hearts
     day["comments"]  += comments
     day["neighbors"] += neighbors
+    if visitors      is not None: day["visitors"]       = visitors
+    if neighbor_total is not None: day["neighbor_total"] = neighbor_total
+    if new_comments  is not None: day["new_comments"]   = new_comments
+    if new_hearts    is not None: day["new_hearts"]     = new_hearts
     data[week_key][today] = day
     _weekly_save(data)
+
+
+def _fetch_blog_daily_stats(driver):
+    """네이버 블로그 통계 API에서 오늘 방문자수·이웃수·새 공감·새 댓글을 가져온다."""
+    import re as _re, json as _j
+    result = {}
+    try:
+        # 블로그 ID 확보
+        blog_id = _my_blog_id
+        if not blog_id:
+            try:
+                driver.get("https://m.blog.naver.com/")
+                time.sleep(2)
+                src = driver.page_source
+                m = _re.search(r'blogId["\s:=]+(["\']?)([a-zA-Z0-9_]+)\1', src)
+                if m:
+                    blog_id = m.group(2)
+            except Exception:
+                pass
+        if not blog_id:
+            glog("⚠️ 블로그 ID를 못 찾아 통계 생략", "error")
+            return result
+
+        today_str = time.strftime("%Y%m%d")
+
+        # 1) 방문자수 — 블로그 통계 API
+        try:
+            url = f"https://blog.naver.com/VisitorCountAsync.naver?blogId={blog_id}&startDate={today_str}&endDate={today_str}"
+            driver.get(url)
+            time.sleep(1.5)
+            src = driver.find_element(By.TAG_NAME, "body").text
+            m = _re.search(r'"totalCount"\s*:\s*(\d+)', src)
+            if not m:
+                m = _re.search(r'(\d+)', src.strip())
+            if m:
+                result["visitors"] = int(m.group(1))
+                glog(f"📊 오늘 방문자: {result['visitors']}명", "info")
+        except Exception as e:
+            glog(f"⚠️ 방문자수 수집 실패: {e}", "error")
+
+        # 2) 이웃수 — 블로그 이웃 현황 API
+        try:
+            url = f"https://blog.naver.com/FollowerList.naver?blogId={blog_id}"
+            driver.get(url)
+            time.sleep(1.5)
+            src = driver.find_element(By.TAG_NAME, "body").text
+            m = _re.search(r'"neighborCount"\s*:\s*(\d+)', src)
+            if not m:
+                m = _re.search(r'totalCount["\s:]+(\d+)', src)
+            if m:
+                result["neighbor_total"] = int(m.group(1))
+                glog(f"📊 현재 이웃수: {result['neighbor_total']}명", "info")
+        except Exception as e:
+            glog(f"⚠️ 이웃수 수집 실패: {e}", "error")
+
+        # 3) 새 공감·댓글 — 알림 페이지
+        try:
+            driver.get("https://www.naver.com/")
+            time.sleep(1.5)
+            src = driver.page_source
+            new_h = len(_re.findall(r'공감|좋아요', src))
+            new_c = len(_re.findall(r'댓글', src))
+            # 더 정확하게: 알림 API
+            driver.get("https://api.noti.naver.com/noti/getStatus")
+            time.sleep(1.5)
+            src2 = driver.find_element(By.TAG_NAME, "body").text
+            try:
+                noti = _j.loads(src2)
+                unread = noti.get("result", {})
+                result["new_comments"] = int(unread.get("comment", 0))
+                result["new_hearts"]   = int(unread.get("sympathyAll", unread.get("sympathy", 0)))
+                glog(f"📊 새 댓글: {result['new_comments']}개  새 공감: {result['new_hearts']}개", "info")
+            except Exception:
+                pass
+        except Exception as e:
+            glog(f"⚠️ 새 공감/댓글 수집 실패: {e}", "error")
+
+    except Exception as e:
+        glog(f"⚠️ 블로그 통계 수집 오류: {e}", "error")
+    return result
 
 def _web_append_log(msg, tag="info"):
     ts = time.strftime("%H:%M:%S")
@@ -1872,8 +1956,18 @@ Details
     else:
         glog("  ⚠️ 텔레그램 발송 실패 — 다음 시작 때 재발송됩니다", "error")
 
-    # 이번 주 누적에 세션 결과 합산
-    _weekly_add(hearts, comments, neighbors)
+    # 이번 주 누적에 세션 결과 합산 + 네이버 블로그 통계
+    _blog_stats = {}
+    try:
+        if shared_driver:
+            _blog_stats = _fetch_blog_daily_stats(shared_driver)
+    except Exception as _e:
+        glog(f"⚠️ 블로그 통계 수집 실패: {_e}", "error")
+    _weekly_add(hearts, comments, neighbors,
+                visitors=_blog_stats.get("visitors"),
+                neighbor_total=_blog_stats.get("neighbor_total"),
+                new_comments=_blog_stats.get("new_comments"),
+                new_hearts=_blog_stats.get("new_hearts"))
 
     # 블로그 통계 → 콜라보 보드 push
     try:
