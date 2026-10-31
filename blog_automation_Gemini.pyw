@@ -203,7 +203,7 @@ def _weekly_save(data):
         pass
 
 def _weekly_add(hearts, comments, neighbors, visitors=None, neighbor_total=None,
-                neighbor_change=None, new_comments=None, new_hearts=None):
+                neighbor_change=None, views=None, new_comments=None, new_hearts=None):
     data = _weekly_load()
     today = time.strftime("%Y-%m-%d")
     week_key = time.strftime("%Y-W%W")
@@ -216,6 +216,7 @@ def _weekly_add(hearts, comments, neighbors, visitors=None, neighbor_total=None,
     if visitors        is not None: day["visitors"]        = visitors
     if neighbor_total  is not None: day["neighbor_total"]  = neighbor_total
     if neighbor_change is not None: day["neighbor_change"] = neighbor_change
+    if views           is not None: day["views"]           = views
     if new_comments    is not None: day["new_comments"]    = new_comments
     if new_hearts      is not None: day["new_hearts"]      = new_hearts
     day["updated_at"] = time.strftime("%H:%M")
@@ -330,8 +331,8 @@ def _board_js(js_call):
 
 
 def _fetch_blog_daily_stats(driver):
-    """blog.stat.naver.com/m/blog/daily/cv 에서 오늘·전날 통계를 수집한다.
-    반환 dict 키: visitors, hearts, comments, neighbor_change, neighbor_total
+    """blog.stat.naver.com/m/blog/daily/cv 에서 오늘 통계를 수집한다.
+    반환 dict 키: visitors, hearts, comments, neighbor_change, views, neighbor_total
     """
     import re as _re
     result = {}
@@ -348,18 +349,20 @@ def _fetch_blog_daily_stats(driver):
             except Exception:
                 return default
 
-        # 오늘 통계 (div[2] 블록)
-        visitors       = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[1]/ul/li[1]/a/div/div/strong")
-        hearts         = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[1]/a/div/div/strong")
-        comments       = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[2]/a/div/div/strong")
-        neighbor_change= _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[3]/a/div/div/strong")
+        # 오늘 통계
+        visitors        = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[1]/ul/li[1]/a/div/div/strong")
+        hearts          = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[1]/a/div/div/strong")
+        comments        = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[2]/a/div/div/strong")
+        neighbor_change = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[1]/div/div/div/div/div[3]/ul/li[3]/a/div/div/strong")
+        views           = _xpath_int("/html/body/div/div/div[2]/div/div[1]/div[2]/div/div[2]/div[2]/div/ul/li/span")
 
-        if visitors       is not None: result["visitors"]        = visitors
-        if hearts         is not None: result["hearts"]          = hearts
-        if comments       is not None: result["comments"]        = comments
+        if visitors        is not None: result["visitors"]        = visitors
+        if hearts          is not None: result["hearts"]          = hearts
+        if comments        is not None: result["comments"]        = comments
         if neighbor_change is not None: result["neighbor_change"] = neighbor_change
+        if views           is not None: result["views"]           = views
 
-        glog(f"📊 오늘 방문자:{visitors}  공감:{hearts}  댓글:{comments}  이웃증감:{neighbor_change:+d}", "info")
+        glog(f"📊 오늘 방문자:{visitors}  조회수:{views}  공감:{hearts}  댓글:{comments}  이웃증감:{neighbor_change:+d}", "info")
 
         # ── 이웃 총 수 — m.blog.naver.com PostList ──
         try:
@@ -411,6 +414,7 @@ def _api_stats():
         "weekly": days,
         "blog_today": {
             "visitors":        today_data.get("visitors"),
+            "views":           today_data.get("views"),
             "hearts":          today_data.get("hearts"),
             "comments":        today_data.get("comments"),
             "neighbor_total":  today_data.get("neighbor_total"),
@@ -584,17 +588,11 @@ _DASH_HTML = r"""<!DOCTYPE html>
   <!-- 오늘 블로그 현황 -->
   <div class="card" id="blog-stat-card" style="display:none">
     <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center">
-      <span>오늘 블로그 현황</span>
+      <span>블로그 현황</span>
       <span id="bstat-time" style="font-size:10px;color:var(--dim)"></span>
     </div>
-    <div class="stat-grid">
-      <div class="sb">
-        <div class="si">👀</div>
-        <div style="display:flex;align-items:baseline;gap:4px">
-          <div class="sv" id="bv">-</div>
-        </div>
-        <div class="sl">방문자</div>
-      </div>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:6px;padding:0 2px">오늘</div>
+    <div class="stat-grid" style="margin-bottom:12px">
       <div class="sb">
         <div class="si">🩷</div>
         <div style="display:flex;align-items:baseline;gap:4px">
@@ -612,10 +610,33 @@ _DASH_HTML = r"""<!DOCTYPE html>
       <div class="sb">
         <div class="si">🤝</div>
         <div style="display:flex;align-items:baseline;gap:4px">
-          <div class="sv" id="bnt">-</div>
-          <div class="sd" id="bnc" style="font-size:12px;font-weight:700"></div>
+          <div class="sv" id="bnc" style="font-size:16px;font-weight:700">-</div>
         </div>
-        <div class="sl">이웃수</div>
+        <div class="sl">이웃증감</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:6px;padding:0 2px">이달 누적</div>
+    <div class="stat-grid">
+      <div class="sb">
+        <div class="si">👀</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <div class="sv" id="bv">-</div>
+        </div>
+        <div class="sl">방문자</div>
+      </div>
+      <div class="sb">
+        <div class="si">📄</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <div class="sv" id="bvw">-</div>
+        </div>
+        <div class="sl">조회수</div>
+      </div>
+      <div class="sb">
+        <div class="si">🤝</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <div class="sv" id="bnt">-</div>
+        </div>
+        <div class="sl">총이웃수</div>
       </div>
     </div>
   </div>
@@ -2109,6 +2130,8 @@ Details
     _weekly_add(hearts, comments, neighbors,
                 visitors=_blog_stats.get("visitors"),
                 neighbor_total=_blog_stats.get("neighbor_total"),
+                neighbor_change=_blog_stats.get("neighbor_change"),
+                views=_blog_stats.get("views"),
                 new_comments=_blog_stats.get("new_comments"),
                 new_hearts=_blog_stats.get("new_hearts"))
 
