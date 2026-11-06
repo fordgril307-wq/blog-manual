@@ -1567,6 +1567,8 @@ class BlogDashboard:
         self.root.after(300, self._load_settings)
         if AUTO_MODE:
             self.root.after(5000, self._auto_start)
+        # 창을 닫으면 백그라운드 스레드(대시보드 등)까지 확실히 종료 — 다음 회차가 막히지 않게
+        self.root.protocol("WM_DELETE_WINDOW", lambda: os._exit(0))
 
     # ───────────────────────────────────────
     def _auto_start(self):
@@ -1577,7 +1579,7 @@ class BlogDashboard:
             self._on_start()
         except Exception as e:
             self._log(f"⚠️ 자동 시작 실패: {e}", "error")
-            self.root.after(10000, self.root.destroy)
+            self.root.after(10000, lambda: os._exit(0))
 
     SETTINGS_PATH = r"C:\blog\settings.json"
 
@@ -1682,7 +1684,7 @@ class BlogDashboard:
                      stats["running"] = False
                      if AUTO_MODE:
                          self._log("🤖 예약 실행 완료 — 1분 뒤 프로그램을 닫습니다.", "info")
-                         self.root.after(60000, self.root.destroy)
+                         self.root.after(60000, lambda: os._exit(0))
          except queue.Empty:
              pass
          self.root.after(200, self._poll_queue)
@@ -3555,6 +3557,7 @@ if __name__ == '__main__':
         _busy = _s.connect_ex(("127.0.0.1", 5001)) == 0
         _s.close()
         if _busy:
+            print("이미 블로그 자동화가 실행 중이라(5001 포트 사용 중) 이번 회차는 건너뜁니다.")
             sys.exit(0)
     _start_web_dashboard()
     import threading as _t2
