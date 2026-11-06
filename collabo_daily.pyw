@@ -376,7 +376,8 @@ def connect(p):
         except Exception:
             if t == 0:
                 PROFILE.mkdir(parents=True, exist_ok=True)
-                subprocess.Popen([CHROME, f"--remote-debugging-port={PORT}", f"--user-data-dir={PROFILE}", "--no-first-run"])
+                subprocess.Popen([CHROME, f"--remote-debugging-port={PORT}", f"--user-data-dir={PROFILE}", "--no-first-run",
+                                  f"--force-device-scale-factor={os.environ.get('BLOG_CHROME_SCALE', '0.25')}"])
                 log("크롬을 켰어요", PROFILE)
                 time.sleep(6)
     raise RuntimeError("크롬(9222)에 연결 못 했어요")

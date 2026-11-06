@@ -44,6 +44,7 @@ _PENDING_REPORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 # ── Chrome debuggerAddress 연결 설정 ──
 CHROME_DEBUG_PORT  = 9222
 CHROME_PROFILE_DIR = r"C:\blog\chrome_profile"
+CHROME_SCALE       = os.environ.get("BLOG_CHROME_SCALE", "0.25")   # 자동화 크롬 화면 배율 (0.25 = 25%)
 AUTO_MODE = "--auto" in sys.argv   # 작업 스케줄러 예약 실행 (설정 불러온 뒤 자동 시작, 끝나면 자동 종료)
 CHROME_EXE         = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
@@ -62,6 +63,7 @@ def _launch_chrome_if_needed():
         pass
     _sp2.Popen([CHROME_EXE,
                 f"--remote-debugging-port={CHROME_DEBUG_PORT}",
+                f"--force-device-scale-factor={CHROME_SCALE}",
                 f"--user-data-dir={CHROME_PROFILE_DIR}"])
     time.sleep(3)
     return False
