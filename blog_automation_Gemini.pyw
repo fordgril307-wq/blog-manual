@@ -3550,15 +3550,23 @@ def _run_worker(cfg):
 # 진입점
 # =============================================
 if __name__ == '__main__':
-    if AUTO_MODE:
-        # 이미 실행 중이면(대시보드 5001 포트 사용 중) 겹치지 않게 조용히 종료
-        import socket as _sock
-        _s = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
-        _busy = _s.connect_ex(("127.0.0.1", 5001)) == 0
-        _s.close()
-        if _busy:
-            print("이미 블로그 자동화가 실행 중이라(5001 포트 사용 중) 이번 회차는 건너뜁니다.")
-            sys.exit(0)
+    # 중복 실행 방지: 윈도우 뮤텍스 (프로그램이 꺼지면 자동으로 풀림)
+    try:
+        import ctypes as _ct
+        _k32 = _ct.WinDLL("kernel32", use_last_error=True)
+        _mutex = _k32.CreateMutexW(None, False, "Local\\blog_automation_Gemini")
+        _already = _ct.get_last_error() == 183  # ERROR_ALREADY_EXISTS
+    except Exception:
+        _already = False
+    if _already:
+        if AUTO_MODE:
+            print("이미 블로그 자동화가 실행 중이라 이번 회차는 건너뜁니다.")
+        else:
+            try:
+                messagebox.showinfo("블로그 자동화", "이미 실행 중이에요. 작업 표시줄의 창을 확인해 주세요.")
+            except Exception:
+                pass
+        sys.exit(0)
     _start_web_dashboard()
     import threading as _t2
     app = BlogDashboard()
