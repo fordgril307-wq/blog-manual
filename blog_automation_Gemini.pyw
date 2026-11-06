@@ -1109,12 +1109,25 @@ pause_event.clear()
 # =============================================
 class BlogDashboard:
     def __init__(self):
+        # 윈도우 디스플레이 배율(125%/150% 등) 때문에 창이 흐릿하게 확대되는 것 방지
+        try:
+            import ctypes as _ctd
+            _ctd.windll.shcore.SetProcessDpiAwareness(1)
+        except Exception:
+            try:
+                import ctypes as _ctd
+                _ctd.windll.user32.SetProcessDPIAware()
+            except Exception:
+                pass
         self.root = tk.Tk()
         self.root.title("블로그 자동화 대시보드")
-        self.root.geometry("1000x780")
+        # 화면 크기에 맞춰 창 크기 조정 (작은 모니터·원격 화면에서도 다 보이게)
+        _sw, _sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        _w, _h = min(1000, int(_sw * 0.9)), min(780, int(_sh * 0.88))
+        self.root.geometry(f"{_w}x{_h}+{max(0, (_sw - _w) // 2)}+{max(0, (_sh - _h) // 3)}")
         self.root.configure(bg="#F4F6F3")
         self.root.resizable(True, True)
-        self.root.minsize(460, 780)
+        self.root.minsize(460, min(500, _h))
         self.root.maxsize(1400, 1400)
 
         # ── 폰트 정의 ──
@@ -1186,7 +1199,7 @@ class BlogDashboard:
             def select(size):
                 if size == "free":
                     self.root.resizable(True, True)
-                    self.root.minsize(460, 780)
+                    self.root.minsize(460, 500)
                     self.root.maxsize(1400, 1400)
                 else:
                     self.root.resizable(False, False)
