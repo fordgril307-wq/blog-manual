@@ -44,6 +44,7 @@ _PENDING_REPORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 # ── Chrome debuggerAddress 연결 설정 ──
 CHROME_DEBUG_PORT  = 9222
 CHROME_PROFILE_DIR = r"C:\blog\chrome_profile"
+AUTO_MODE = "--auto" in sys.argv   # 작업 스케줄러 예약 실행 (설정 불러온 뒤 자동 시작, 끝나면 자동 종료)
 CHROME_EXE         = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 import subprocess as _sp2
@@ -1564,8 +1565,20 @@ class BlogDashboard:
         self.root.after(200, self._poll_queue)
         # 저장된 설정 자동 불러오기
         self.root.after(300, self._load_settings)
+        if AUTO_MODE:
+            self.root.after(5000, self._auto_start)
 
     # ───────────────────────────────────────
+    def _auto_start(self):
+        """--auto: 저장된 설정으로 '이웃 제한' 켜고 바로 시작 (작업 스케줄러용)"""
+        try:
+            self.skip_below_prem_var.set(True)   # 최소 댓글수 미달 시 이웃추가 스킵
+            self._log("🤖 예약 실행: 자동으로 시작합니다.", "info")
+            self._on_start()
+        except Exception as e:
+            self._log(f"⚠️ 자동 시작 실패: {e}", "error")
+            self.root.after(10000, self.root.destroy)
+
     SETTINGS_PATH = r"C:\blog\settings.json"
 
     def _load_settings(self):
@@ -1667,6 +1680,9 @@ class BlogDashboard:
                                            command=self._on_start)
                      self.status_dot.config(text="●  완료", fg="#28C840")
                      stats["running"] = False
+                     if AUTO_MODE:
+                         self._log("🤖 예약 실행 완료 — 1분 뒤 프로그램을 닫습니다.", "info")
+                         self.root.after(60000, self.root.destroy)
          except queue.Empty:
              pass
          self.root.after(200, self._poll_queue)
@@ -3532,6 +3548,14 @@ def _run_worker(cfg):
 # 진입점
 # =============================================
 if __name__ == '__main__':
+    if AUTO_MODE:
+        # 이미 실행 중이면(대시보드 5001 포트 사용 중) 겹치지 않게 조용히 종료
+        import socket as _sock
+        _s = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
+        _busy = _s.connect_ex(("127.0.0.1", 5001)) == 0
+        _s.close()
+        if _busy:
+            sys.exit(0)
     _start_web_dashboard()
     import threading as _t2
     app = BlogDashboard()
