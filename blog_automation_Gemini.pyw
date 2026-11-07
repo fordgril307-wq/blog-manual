@@ -309,16 +309,50 @@ def _board_js(js_call):
             board_handle = driver.window_handles[-1]
             driver.switch_to.window(board_handle)
             opened_new = True
-            # 페이지 로드 + cbBlogStats 함수 등장 대기 (최대 20초)
-            WebDriverWait(driver, 20).until(
-                lambda d: d.execute_script("return typeof window.cbBlogStats === 'function'")
-            )
-            time.sleep(1)
         else:
             driver.switch_to.window(board_handle)
 
+        # 보드 함수(cbBlogStats)는 아티팩트 iframe 안에 있음 → 프레임을 뒤져서 찾음 (최대 60초)
+        from selenium.webdriver.common.by import By
+        def _find_board_frame(depth=0):
+            try:
+                if driver.execute_script("return typeof window.cbBlogStats === 'function'"):
+                    return True
+            except Exception:
+                pass
+            if depth >= 3:
+                return False
+            try:
+                frames = driver.find_elements(By.TAG_NAME, "iframe")
+            except Exception:
+                frames = []
+            for i in range(len(frames)):
+                try:
+                    driver.switch_to.frame(driver.find_elements(By.TAG_NAME, "iframe")[i])
+                    if _find_board_frame(depth + 1):
+                        return True
+                    driver.switch_to.parent_frame()
+                except Exception:
+                    try:
+                        driver.switch_to.parent_frame()
+                    except Exception:
+                        pass
+            return False
+        _end = time.time() + 60
+        _found = False
+        while time.time() < _end:
+            driver.switch_to.default_content()
+            if _find_board_frame():
+                _found = True
+                break
+            time.sleep(2)
+        if not _found:
+            raise RuntimeError("보드 함수를 못 찾음 (크롬에서 claude.ai 로그인 확인)")
+        time.sleep(1)
+
         # JS 함수 호출 및 결과 수집
-        result = driver.execute_script(f"return await {js_call};")
+        result = driver.execute_script(f"return Promise.resolve({js_call}).then(r=>r===undefined?null:r);")
+        driver.switch_to.default_content()
 
     finally:
         if opened_new:
