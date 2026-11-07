@@ -267,8 +267,21 @@ def _push_blog_stats_to_board(blog_stats, hearts, comments, neighbors):
         glog("📊 콜라보 보드 블로그 통계 push 중...", "info")
         _board_js(f"cbBlogStats({_j.dumps(rows, ensure_ascii=False)})")
         glog(f"✅ 콜라보 보드 블로그 통계 push 완료 (활동 {today} / 블로그통계 {yday})", "success")
+        _board_log(f"OK {rows}")
     except Exception as _e:
         glog(f"⚠️ 콜라보 보드 통계 push 실패: {_e}", "error")
+        import traceback as _tb
+        _board_log("FAIL " + _tb.format_exc())
+
+
+def _board_log(msg):
+    """보드 push 결과를 C:\\blog\\board_push.log 에 남김 (원인 확인용)"""
+    try:
+        _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_push.log")
+        with open(_p, "a", encoding="utf-8") as _f:
+            _f.write(time.strftime("%m/%d %H:%M:%S ") + str(msg) + "\n")
+    except Exception:
+        pass
 
 
 def _push_ngrok_to_board(url=None):
@@ -286,6 +299,8 @@ def _push_ngrok_to_board(url=None):
         glog(f"✅ 콜라보 보드 ngrok URL push 완료", "success")
     except Exception as _e:
         glog(f"⚠️ 콜라보 보드 ngrok push 실패: {_e}", "error")
+        import traceback as _tb
+        _board_log("NGROK FAIL " + _tb.format_exc())
 
 
 def _board_js(js_call):
@@ -295,6 +310,13 @@ def _board_js(js_call):
     import json as _j
 
     driver = shared_driver
+    # 댓글 제한 등으로 열린 알림창이 있으면 먼저 닫음 (열려 있으면 다른 명령이 다 막힘)
+    for _ in range(3):
+        try:
+            driver.switch_to.alert.accept()
+            time.sleep(0.5)
+        except Exception:
+            break
     original_handle = driver.current_window_handle
     opened_new = False
 
