@@ -234,31 +234,39 @@ _COLLABO_BOARD_URL = "https://claude.ai/artifact/157Ly54Be85vAKoMSwiJkN"
 _last_ngrok_url    = None   # 현재 세션 ngrok URL 캐시
 
 def _push_blog_stats_to_board(blog_stats, hearts, comments, neighbors):
-    """블로그 통계를 콜라보 보드에 Selenium으로 직접 push."""
-    import json as _j
+    """블로그 통계를 콜라보 보드에 Selenium으로 직접 push.
+    - 오늘 날짜: 내 활동(공감·댓글·이웃신청) — 오늘 여러 회차를 합친 누적값
+    - 어제 날짜: 네이버 블로그 통계(방문자·조회수·이웃수 등) — 통계 페이지가 주는 '전날 확정값'
+    """
+    import json as _j, datetime as _dt
     try:
         if not shared_driver:
             glog("⚠️ 콜라보 보드 push 불가 — 드라이버 없음", "error")
             return
         today = time.strftime("%Y-%m-%d")
-        row = {
-            "date":            today,
-            "hearts":          hearts,
-            "comments":        comments,
-            "neighbors":       neighbors,
-            "visitors":        blog_stats.get("visitors"),
-            "neighbor_total":  blog_stats.get("neighbor_total"),
-            "neighbor_change": blog_stats.get("neighbor_change"),
-            "views":           blog_stats.get("views"),
-            "new_comments":    blog_stats.get("new_comments"),
-            "new_hearts":      blog_stats.get("new_hearts"),
-        }
-        # None 값 제거 (JS 쪽에서 undefined 처리 맞게)
-        row = {k: v for k, v in row.items() if v is not None}
+        yday = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+        # 오늘 누적(여러 회차 합계)은 .weekly_stats.json 에서 읽음
+        day = {}
+        try:
+            day = _weekly_load().get(time.strftime("%Y-W%W"), {}).get(today, {}) or {}
+        except Exception:
+            day = {}
+        rows = [{
+            "date":      today,
+            "hearts":    day.get("hearts", hearts),
+            "comments":  day.get("comments", comments),
+            "neighbors": day.get("neighbors", neighbors),
+        }]
+        yrow = {"date": yday}
+        for k in ("visitors", "views", "neighbor_total", "neighbor_change", "new_comments", "new_hearts"):
+            if blog_stats.get(k) is not None:
+                yrow[k] = blog_stats.get(k)
+        if len(yrow) > 1:
+            rows.append(yrow)
 
         glog("📊 콜라보 보드 블로그 통계 push 중...", "info")
-        _board_js(f"cbBlogStats([{_j.dumps(row, ensure_ascii=False)}])")
-        glog(f"✅ 콜라보 보드 블로그 통계 push 완료 ({today})", "success")
+        _board_js(f"cbBlogStats({_j.dumps(rows, ensure_ascii=False)})")
+        glog(f"✅ 콜라보 보드 블로그 통계 push 완료 (활동 {today} / 블로그통계 {yday})", "success")
     except Exception as _e:
         glog(f"⚠️ 콜라보 보드 통계 push 실패: {_e}", "error")
 
