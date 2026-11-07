@@ -43,11 +43,11 @@ def log(*a):
         pass
 
 
-def http(url, referer="https://moaview.co.kr/", binary=False, tries=3):
+def http(url, referer="https://moaview.co.kr/", binary=False, tries=3, timeout=40):
     import requests
     for t in range(tries):
         try:
-            r = requests.get(url, headers={"User-Agent": UA, "Referer": referer, "X-Requested-With": "XMLHttpRequest"}, timeout=40)
+            r = requests.get(url, headers={"User-Agent": UA, "Referer": referer, "X-Requested-With": "XMLHttpRequest"}, timeout=timeout)
             r.raise_for_status()
             return r.content if binary else r
         except Exception as e:
@@ -138,24 +138,24 @@ def collect(known_urls):
 
 
 def thumb(url):
-    if not url:
+    if not url or url.endswith("/"):
         return ""
     if url.startswith("//"):
         url = "https:" + url
     from PIL import Image
     import urllib.parse
     host = url.split("/")[2] if "//" in url else ""
-    for src in (url, "https://wsrv.nl/?url=" + urllib.parse.quote(url, safe="") + "&w=320&output=jpg"):
-        b = http(src, referer="https://" + host + "/", binary=True, tries=2)
+    for src in (url, "https://wsrv.nl/?url=" + urllib.parse.quote(url, safe="") + "&w=240&output=jpg"):
+        b = http(src, referer="https://" + host + "/", binary=True, tries=1, timeout=15)
         if not b:
             continue
         try:
             im = Image.open(io.BytesIO(b)).convert("RGB")
             w, h = im.size
             s = min(w, h)
-            im = im.crop(((w - s) // 2, (h - s) // 2, (w - s) // 2 + s, (h - s) // 2 + s)).resize((160, 160), Image.LANCZOS)
+            im = im.crop(((w - s) // 2, (h - s) // 2, (w - s) // 2 + s, (h - s) // 2 + s)).resize((120, 120), Image.LANCZOS)
             buf = io.BytesIO()
-            im.save(buf, "JPEG", quality=72, optimize=True)
+            im.save(buf, "JPEG", quality=60, optimize=True)
             return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
         except Exception as e:
             log("사진 변환 실패", url[:60], e)
@@ -448,11 +448,13 @@ def run(page):
         new = [c for c in new if c["id"] not in known_ids]
         log("새 후보", len(new))
         thumbs = {}
-        for c in new:
-            u = c.pop("_img", "")
-            d = thumb(u)
-            if d:
-                thumbs[c["id"]] = d
+        # 사진은 8장씩 동시에 받아 줄임 (한 장씩 받으면 수백 개일 때 너무 오래 걸림)
+        from concurrent.futures import ThreadPoolExecutor
+        jobs = [(c["id"], c.pop("_img", "")) for c in new]
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for cid, d in zip([j[0] for j in jobs], ex.map(lambda j: thumb(j[1]), jobs)):
+                if d:
+                    thumbs[cid] = d
         log("사진", len(thumbs))
         if new:
             pend = BASE / "pending_import.json"
