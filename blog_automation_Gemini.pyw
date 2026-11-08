@@ -1828,6 +1828,7 @@ class BlogDashboard:
 
         stats["hearts"] = 0
         stats["comments"] = 0
+        _live_done.update({"hearts": 0, "comments": 0, "neighbors": 0})
         stats["blocks"] = 0
         stats["skips"] = 0
         stats["neighbors"] = 0
@@ -2277,7 +2278,9 @@ Details
             _blog_stats = _fetch_blog_daily_stats(shared_driver)
     except Exception as _e:
         glog(f"⚠️ 블로그 통계 수집 실패: {_e}", "error")
-    _weekly_add(hearts, comments, neighbors,
+    # 휴식 때마다 이미 넣은 몫(_live_done)은 빼고 남은 것만 더함
+    _weekly_add(max(0, hearts - _live_done["hearts"]), max(0, comments - _live_done["comments"]),
+                max(0, neighbors - _live_done["neighbors"]),
                 visitors=_blog_stats.get("visitors"),
                 neighbor_total=_blog_stats.get("neighbor_total"),
                 neighbor_change=_blog_stats.get("neighbor_change"),
@@ -2286,6 +2289,7 @@ Details
                 new_hearts=_blog_stats.get("new_hearts"))
 
     # 블로그 통계 → 콜라보 보드 직접 push (Selenium)
+    _live_done.update({"hearts": hearts, "comments": comments, "neighbors": neighbors})
     _push_blog_stats_to_board(_blog_stats, hearts, comments, neighbors)
 
     # ngrok URL → 콜라보 보드 직접 push (Selenium)
@@ -3148,6 +3152,34 @@ def collect_blog_ids_from_search(driver, keyword, order_type, visit_count):
 # =============================================
 # 검색 모드 메인
 # =============================================
+_live_done = {"hearts": 0, "comments": 0, "neighbors": 0}
+_live_stats_day = {"d": ""}
+
+
+def _live_flush():
+    """휴식 들어갈 때마다: 지금까지 한 공감·댓글을 오늘 날짜에 더하고 콜라보 보드에 바로 보냄.
+    (예전엔 세션이 끝나야 보내서, 하루 넘게 도는 세션이면 보드가 비어 있었음)
+    하루에 한 번은 네이버 통계(어제 확정값)도 같이 보냄."""
+    try:
+        d = {k: max(0, stats.get(k, 0) - _live_done[k]) for k in _live_done}
+        if any(d.values()):
+            _weekly_add(d["hearts"], d["comments"], d["neighbors"])
+            for k in _live_done:
+                _live_done[k] += d[k]
+        bs = {}
+        today = time.strftime("%Y-%m-%d")
+        if _live_stats_day["d"] != today and shared_driver:
+            try:
+                bs = _fetch_blog_daily_stats(shared_driver) or {}
+                if bs:
+                    _live_stats_day["d"] = today
+            except Exception as _e:
+                glog(f"⚠️ 블로그 통계 수집 실패: {_e}", "error")
+        _push_blog_stats_to_board(bs, stats.get("hearts", 0), stats.get("comments", 0), stats.get("neighbors", 0))
+    except Exception as _e:
+        glog(f"⚠️ 중간 보드 push 실패: {_e}", "error")
+
+
 def batch_rest(batch_count, driver=None):
     """배치 단위 완료 후 긴 휴식 (5~30분 랜덤)
     휴식 중 30초마다 실제 페이지 이동으로 크롬 절전 방지.
@@ -3156,6 +3188,7 @@ def batch_rest(batch_count, driver=None):
     _rest_log.append((batch_count, round(rest_sec / 60, 1), time.strftime('%H:%M')))
     glog(f"  ☕ 배치 {batch_count}개 완료 — {rest_sec/60:.1f}분 휴식 중...", "warn")
     _tg_send(f"☕ 배치 {batch_count}개 완료 — {rest_sec/60:.1f}분 휴식 시작 (이웃추가 {stats.get('neighbors', 0)}개)")
+    _live_flush()
     deadline = time.time() + rest_sec
     last_keepalive = time.time()
     _base = f"https://m.blog.naver.com/{_my_blog_id}" if _my_blog_id else "https://m.blog.naver.com"
