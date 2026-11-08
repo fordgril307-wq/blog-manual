@@ -333,12 +333,11 @@ def _board_js(js_call):
                 pass
 
         if not board_handle:
-            # 새 탭에서 보드 열기
-            driver.execute_script(f"window.open('{_COLLABO_BOARD_URL}', '_blank');")
-            time.sleep(0.5)
-            board_handle = driver.window_handles[-1]
-            driver.switch_to.window(board_handle)
+            # 새 탭에서 보드 열기 (window.open 은 팝업 차단에 막힐 수 있어서 셀레니움 새 탭 사용)
+            driver.switch_to.new_window('tab')
+            board_handle = driver.current_window_handle
             opened_new = True
+            driver.get(_COLLABO_BOARD_URL)
         else:
             driver.switch_to.window(board_handle)
 
@@ -368,16 +367,32 @@ def _board_js(js_call):
                     except Exception:
                         pass
             return False
-        _end = time.time() + 60
         _found = False
-        while time.time() < _end:
-            driver.switch_to.default_content()
-            if _find_board_frame():
-                _found = True
+        for _try in range(2):   # 60초 안에 못 찾으면 새로고침하고 한 번 더
+            _end = time.time() + 60
+            while time.time() < _end:
+                driver.switch_to.default_content()
+                if _find_board_frame():
+                    _found = True
+                    break
+                time.sleep(2)
+            if _found:
                 break
-            time.sleep(2)
+            try:
+                driver.switch_to.default_content()
+                driver.refresh()
+            except Exception:
+                pass
         if not _found:
-            raise RuntimeError("보드 함수를 못 찾음 (크롬에서 claude.ai 로그인 확인)")
+            _diag = ""
+            try:
+                driver.switch_to.default_content()
+                _fr = [(f.get_attribute("src") or "")[:100] for f in driver.find_elements(By.TAG_NAME, "iframe")]
+                _diag = (f" | 주소={driver.current_url} | 제목={driver.title} | iframe={_fr} | 화면="
+                         + (driver.execute_script("return (document.body&&document.body.innerText||'').slice(0,200)") or "").replace("\n", " "))
+            except Exception as _de:
+                _diag = f" | 진단 실패: {_de}"
+            raise RuntimeError("보드 함수를 못 찾음" + _diag)
         time.sleep(1)
 
         # JS 함수 호출 및 결과 수집
