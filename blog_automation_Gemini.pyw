@@ -3590,6 +3590,14 @@ def _run_worker(cfg):
             _allow_sleep()
             return
 
+    # 시작할 때 한 번: 네이버 통계(어제 확정값) + 오늘 지금까지 활동을 콜라보 보드에 올림
+    try:
+        glog("📊 시작 전 내 블로그 현황을 보드에 올리는 중...", "info")
+        _live_stats_day["d"] = ""
+        _live_flush()
+    except Exception as _e:
+        glog(f"⚠️ 시작 전 보드 업데이트 실패: {_e}", "error")
+
     end_reason   = "정상 완료"
     error_detail = ""
     _session_retries = 0
