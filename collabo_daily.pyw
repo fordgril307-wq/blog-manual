@@ -4,6 +4,7 @@ r"""콜라보 보드 체험단 후보 자동 수집 (매일 아침, Claude 없�
 하는 일
   1. 모아뷰 지도 데이터에서 7호선(산곡~논현)·신림선 역 근처 방문형 체험단을 고른다
      (역 700m 안 / 블로그·클립만)
+     + 모아뷰 배송 탭에서 블로그·클립 배송형 (인기순 200 + 최신 60, 아동·반려동물 제외)
   2. 보드에 이미 있는 건 빼고, 새 후보의 사진을 작게 줄인다
   3. 이 폴더 전용 크롬 창으로 콜라보 보드를 열어 새 후보와 사진을 보드에 넣는다
   - 체험단 사이트 로그인이나 신청은 하지 않는다.
@@ -134,6 +135,71 @@ def collect(known_urls):
                         "cat2": cat, "sub": x.get("Category") or "", "st": "new", "found": now, "via": "자동 수집(pyw)",
                         "_img": d.get("ImgUrl") or ""})
         time.sleep(0.3)
+    return out
+
+
+DCAT = {"식품": 2010, "뷰티": 2020, "패션": 2030, "생활": 2040, "서비스": 2050, "디지털": 2070, "도서": 2080, "기타": 2990}
+DPLAT = {"리뷰노트", "강남맛집", "디너의여왕", "레뷰", "미블", "포포몬", "서울오빠", "체험뷰", "클라우드리뷰", "리뷰플레이스", "아싸뷰", "티블", "놀러와", "링블", "어디야체험단"}
+
+
+def collect_delivery(known_urls, pages_pop=10, pages_new=3):
+    """모아뷰 배송 탭(Type 20)에서 블로그·클립 배송형 체험단을 모은다.
+    인기순(지원자 많은 순) 상위 + 최신순 상위. 아동·반려동물 제외, 클라우드리뷰는 식품만."""
+    import requests, hashlib, html as _h
+    body = {"Type": 20, "Channel": "100,110", "Platform": "", "Category": ",".join(str(v) for v in DCAT.values()),
+            "ApplyRateUp": "", "ApplyRateDown": "", "DayUp": "", "DayDown": "", "PointUp": "", "PointDown": "",
+            "OfferUp": "", "OfferDown": "", "LimitUp": "", "LimitDown": "", "ApplyUp": "", "ApplyDown": ""}
+    seen, out, now = set(), [], int(time.time() * 1000)
+    today = datetime.datetime.utcnow() + datetime.timedelta(hours=9)
+    txt = lambda m: _h.unescape(re.sub(r"<[^>]+>", " ", m or "")).split() and " ".join(_h.unescape(re.sub(r"<[^>]+>", " ", m or "")).split()) or ""
+    for sort, pages in (("3", pages_pop), ("1", pages_new)):
+        for pg in range(1, pages + 1):
+            try:
+                r = requests.post("https://moaview.co.kr/home/filter", json={**body, "Sort": sort, "PageNo": pg},
+                                  headers={"User-Agent": UA, "Referer": "https://moaview.co.kr/?type=20"}, timeout=30)
+                r.raise_for_status()
+            except Exception as e:
+                log("배송 목록 못 받음", pg, str(e)[:60])
+                break
+            items = re.findall(r'<li class="list_item"(.*?)</a>\s*</li>', r.text, re.S)
+            if not items:
+                break
+            for it in items:
+                url = _h.unescape((re.search(r'data-url="([^"]+)"', it) or [None, ""])[1])
+                if not url or url in seen or url in known_urls:
+                    continue
+                seen.add(url)
+                tags = [txt(x) for x in re.findall(r'<li class="filter_item">(.*?)</li>', it, re.S)]
+                title = txt((re.search(r'class="info_tit">(.*?)</h3>', it, re.S) or [None, ""])[1])
+                offer = txt((re.search(r'class="info_offer">(.*?)</div>', it, re.S) or [None, ""])[1])
+                point = txt((re.search(r'class="filter_point">(.*?)</li>', it, re.S) or [None, ""])[1])
+                img = _h.unescape((re.search(r'<img src="([^"]+)"', it) or [None, ""])[1])
+                offs = [txt(x) for x in re.findall(r'<div class="date_offer">(.*?)</div>', it, re.S)]
+                dday = next((o for o in offs if o.startswith("마감")), "")
+                site = next((o for o in offs if o in DPLAT), "기타")
+                rate = next((o.replace("경쟁률", "").strip() for o in offs if o.startswith("경쟁률")), "")
+                sup = next((o.replace("지원", "").strip() for o in offs if o.startswith("지원")), "")
+                m = re.search(r"D-(\d+)", dday)
+                if not m or int(m.group(1)) < 1:
+                    continue   # 오늘 마감(D-0)이나 날짜 모르는 건 건너뜀
+                due = (today + datetime.timedelta(days=int(m.group(1)))).strftime("%Y-%m-%d")
+                ch = [t for t in tags if t in ("블로그", "클립")] or ["블로그"]
+                cat = next((t for t in tags if t in DCAT), "기타")
+                if re.search(r"유아|아기|키즈|아동|어린이|육아|베이비|강아지|고양이|반려", title + " " + offer):
+                    continue
+                if site == "클라우드리뷰" and cat != "식품":
+                    continue
+                ap, lim = (sup.replace(" ", "").split("/") + ["", ""])[:2] if "/" in sup else ("", "")
+                warn = ["배송형 — 제품 받고 기한 안에 리뷰"]
+                if cat == "뷰티":
+                    warn.append("화장품이면 얼굴 노출 없는 사진 리뷰만")
+                out.append({"id": "mvd-" + hashlib.md5(url.encode()).hexdigest()[:12], "site": site, "t": title, "url": url,
+                            "type": "배송형", "ch": ch, "region": "", "offer": offer, "point": point, "due": due, "match": [],
+                            "warn": warn, "apply": int(ap) if ap.isdigit() else None, "limit": int(lim) if lim.isdigit() else None,
+                            "rate": float(rate) if re.match(r"^[0-9.]+$", rate) else None,
+                            "cat2": cat, "sub": cat, "st": "new", "found": now, "via": "자동 수집(pyw·배송)", "_img": img})
+            time.sleep(0.4)
+    log("배송형 후보", len(out))
     return out
 
 
@@ -444,6 +510,10 @@ def run(page):
                 log("지난번 후보 넣기 실패", str(e).splitlines()[0][:80])
         known = set(st.get("urls") or [])
         new = collect(known)
+        try:
+            new += collect_delivery(known)
+        except Exception as e:
+            log("배송형 수집 실패", str(e)[:80])
         known_ids = set(st.get("ids") or [])
         new = [c for c in new if c["id"] not in known_ids]
         log("새 후보", len(new))
