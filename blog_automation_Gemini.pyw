@@ -3661,6 +3661,23 @@ def _run_worker(cfg):
                     glog(f"  ❌ 크롬 재연결 실패: {e2}", "error")
                     error_detail = f"크롬 재연결 실패: {e2}"
                     end_reason   = "오류 발생"
+            elif ("로그인" in err_str or "login" in err_str.lower()) and _session_retries < _MAX_SESSION_RETRIES:
+                # 네이버 로그인이 풀린 경우 (비밀번호 변경 등): 텔레그램으로 바로 알리고, 로그인되면 저절로 이어서 진행
+                _session_retries += 1
+                glog("  🔑 네이버 로그인이 풀렸어요 — 크롬에서 다시 로그인하면 자동으로 이어서 진행합니다", "warn")
+                _tg_send("🔑 네이버 로그인 풀림!\n서버 컴퓨터 블로그 자동화 크롬에서 네이버에 다시 로그인해 주세요.\n로그인되면 30초 안에 저절로 이어서 진행해요 (버튼 안 눌러도 됨).")
+                try:
+                    driver.switch_to.alert.accept()
+                except Exception:
+                    pass
+                try:
+                    driver.get("https://nid.naver.com/nidlogin.login")
+                except Exception:
+                    pass
+                _wait_for_login(driver)
+                if stop_event.is_set():
+                    break
+                continue
             else:
                 error_detail = err_str
                 end_reason   = "오류 발생"
