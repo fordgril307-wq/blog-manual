@@ -234,33 +234,54 @@ _COLLABO_BOARD_URL = "https://claude.ai/artifact/157Ly54Be85vAKoMSwiJkN"
 _last_ngrok_url    = None   # 현재 세션 ngrok URL 캐시
 
 def _push_blog_stats_to_board(blog_stats, hearts, comments, neighbors):
-    """블로그 통계를 콜라보 보드에 Selenium으로 직접 push."""
-    import json as _j
+    """블로그 통계를 콜라보 보드에 Selenium으로 직접 push.
+    - 오늘 날짜: 내 활동(공감·댓글·이웃신청) — 오늘 여러 회차를 합친 누적값
+    - 어제 날짜: 네이버 블로그 통계(방문자·조회수·이웃수 등) — 통계 페이지가 주는 '전날 확정값'
+    """
+    import json as _j, datetime as _dt
     try:
         if not shared_driver:
             glog("⚠️ 콜라보 보드 push 불가 — 드라이버 없음", "error")
             return
         today = time.strftime("%Y-%m-%d")
-        row = {
-            "date":            today,
-            "hearts":          hearts,
-            "comments":        comments,
-            "neighbors":       neighbors,
-            "visitors":        blog_stats.get("visitors"),
-            "neighbor_total":  blog_stats.get("neighbor_total"),
-            "neighbor_change": blog_stats.get("neighbor_change"),
-            "views":           blog_stats.get("views"),
-            "new_comments":    blog_stats.get("new_comments"),
-            "new_hearts":      blog_stats.get("new_hearts"),
-        }
-        # None 값 제거 (JS 쪽에서 undefined 처리 맞게)
-        row = {k: v for k, v in row.items() if v is not None}
+        yday = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+        # 오늘 누적(여러 회차 합계)은 .weekly_stats.json 에서 읽음
+        day = {}
+        try:
+            day = _weekly_load().get(time.strftime("%Y-W%W"), {}).get(today, {}) or {}
+        except Exception:
+            day = {}
+        rows = [{
+            "date":      today,
+            "hearts":    day.get("hearts", hearts),
+            "comments":  day.get("comments", comments),
+            "neighbors": day.get("neighbors", neighbors),
+        }]
+        yrow = {"date": yday}
+        for k in ("visitors", "views", "neighbor_total", "neighbor_change", "new_comments", "new_hearts"):
+            if blog_stats.get(k) is not None:
+                yrow[k] = blog_stats.get(k)
+        if len(yrow) > 1:
+            rows.append(yrow)
 
         glog("📊 콜라보 보드 블로그 통계 push 중...", "info")
-        _board_js(f"cbBlogStats([{_j.dumps(row, ensure_ascii=False)}])")
-        glog(f"✅ 콜라보 보드 블로그 통계 push 완료 ({today})", "success")
+        _board_js(f"cbBlogStats({_j.dumps(rows, ensure_ascii=False)})")
+        glog(f"✅ 콜라보 보드 블로그 통계 push 완료 (활동 {today} / 블로그통계 {yday})", "success")
+        _board_log(f"OK {rows}")
     except Exception as _e:
         glog(f"⚠️ 콜라보 보드 통계 push 실패: {_e}", "error")
+        import traceback as _tb
+        _board_log("FAIL " + _tb.format_exc())
+
+
+def _board_log(msg):
+    """보드 push 결과를 C:\\blog\\board_push.log 에 남김 (원인 확인용)"""
+    try:
+        _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "board_push.log")
+        with open(_p, "a", encoding="utf-8") as _f:
+            _f.write(time.strftime("%m/%d %H:%M:%S ") + str(msg) + "\n")
+    except Exception:
+        pass
 
 
 def _push_ngrok_to_board(url=None):
@@ -278,6 +299,8 @@ def _push_ngrok_to_board(url=None):
         glog(f"✅ 콜라보 보드 ngrok URL push 완료", "success")
     except Exception as _e:
         glog(f"⚠️ 콜라보 보드 ngrok push 실패: {_e}", "error")
+        import traceback as _tb
+        _board_log("NGROK FAIL " + _tb.format_exc())
 
 
 def _board_js(js_call):
@@ -287,6 +310,13 @@ def _board_js(js_call):
     import json as _j
 
     driver = shared_driver
+    # 댓글 제한 등으로 열린 알림창이 있으면 먼저 닫음 (열려 있으면 다른 명령이 다 막힘)
+    for _ in range(3):
+        try:
+            driver.switch_to.alert.accept()
+            time.sleep(0.5)
+        except Exception:
+            break
     original_handle = driver.current_window_handle
     opened_new = False
 
@@ -303,22 +333,71 @@ def _board_js(js_call):
                 pass
 
         if not board_handle:
-            # 새 탭에서 보드 열기
-            driver.execute_script(f"window.open('{_COLLABO_BOARD_URL}', '_blank');")
-            time.sleep(0.5)
-            board_handle = driver.window_handles[-1]
-            driver.switch_to.window(board_handle)
+            # 새 탭에서 보드 열기 (window.open 은 팝업 차단에 막힐 수 있어서 셀레니움 새 탭 사용)
+            driver.switch_to.new_window('tab')
+            board_handle = driver.current_window_handle
             opened_new = True
-            # 페이지 로드 + cbBlogStats 함수 등장 대기 (최대 20초)
-            WebDriverWait(driver, 20).until(
-                lambda d: d.execute_script("return typeof window.cbBlogStats === 'function'")
-            )
-            time.sleep(1)
+            driver.get(_COLLABO_BOARD_URL)
         else:
             driver.switch_to.window(board_handle)
 
+        # 보드 함수(cbBlogStats)는 아티팩트 iframe 안에 있음 → 프레임을 뒤져서 찾음 (최대 60초)
+        from selenium.webdriver.common.by import By
+        def _find_board_frame(depth=0):
+            try:
+                if driver.execute_script("return typeof window.cbBlogStats === 'function'"):
+                    return True
+            except Exception:
+                pass
+            if depth >= 3:
+                return False
+            try:
+                frames = driver.find_elements(By.TAG_NAME, "iframe")
+            except Exception:
+                frames = []
+            for i in range(len(frames)):
+                try:
+                    driver.switch_to.frame(driver.find_elements(By.TAG_NAME, "iframe")[i])
+                    if _find_board_frame(depth + 1):
+                        return True
+                    driver.switch_to.parent_frame()
+                except Exception:
+                    try:
+                        driver.switch_to.parent_frame()
+                    except Exception:
+                        pass
+            return False
+        _found = False
+        for _try in range(2):   # 60초 안에 못 찾으면 새로고침하고 한 번 더
+            _end = time.time() + 60
+            while time.time() < _end:
+                driver.switch_to.default_content()
+                if _find_board_frame():
+                    _found = True
+                    break
+                time.sleep(2)
+            if _found:
+                break
+            try:
+                driver.switch_to.default_content()
+                driver.refresh()
+            except Exception:
+                pass
+        if not _found:
+            _diag = ""
+            try:
+                driver.switch_to.default_content()
+                _fr = [(f.get_attribute("src") or "")[:100] for f in driver.find_elements(By.TAG_NAME, "iframe")]
+                _diag = (f" | 주소={driver.current_url} | 제목={driver.title} | iframe={_fr} | 화면="
+                         + (driver.execute_script("return (document.body&&document.body.innerText||'').slice(0,200)") or "").replace("\n", " "))
+            except Exception as _de:
+                _diag = f" | 진단 실패: {_de}"
+            raise RuntimeError("보드 함수를 못 찾음" + _diag)
+        time.sleep(1)
+
         # JS 함수 호출 및 결과 수집
-        result = driver.execute_script(f"return await {js_call};")
+        result = driver.execute_script(f"return Promise.resolve({js_call}).then(r=>r===undefined?null:r);")
+        driver.switch_to.default_content()
 
     finally:
         if opened_new:
@@ -1764,6 +1843,7 @@ class BlogDashboard:
 
         stats["hearts"] = 0
         stats["comments"] = 0
+        _live_done.update({"hearts": 0, "comments": 0, "neighbors": 0})
         stats["blocks"] = 0
         stats["skips"] = 0
         stats["neighbors"] = 0
@@ -2213,7 +2293,9 @@ Details
             _blog_stats = _fetch_blog_daily_stats(shared_driver)
     except Exception as _e:
         glog(f"⚠️ 블로그 통계 수집 실패: {_e}", "error")
-    _weekly_add(hearts, comments, neighbors,
+    # 휴식 때마다 이미 넣은 몫(_live_done)은 빼고 남은 것만 더함
+    _weekly_add(max(0, hearts - _live_done["hearts"]), max(0, comments - _live_done["comments"]),
+                max(0, neighbors - _live_done["neighbors"]),
                 visitors=_blog_stats.get("visitors"),
                 neighbor_total=_blog_stats.get("neighbor_total"),
                 neighbor_change=_blog_stats.get("neighbor_change"),
@@ -2222,6 +2304,7 @@ Details
                 new_hearts=_blog_stats.get("new_hearts"))
 
     # 블로그 통계 → 콜라보 보드 직접 push (Selenium)
+    _live_done.update({"hearts": hearts, "comments": comments, "neighbors": neighbors})
     _push_blog_stats_to_board(_blog_stats, hearts, comments, neighbors)
 
     # ngrok URL → 콜라보 보드 직접 push (Selenium)
@@ -3084,6 +3167,34 @@ def collect_blog_ids_from_search(driver, keyword, order_type, visit_count):
 # =============================================
 # 검색 모드 메인
 # =============================================
+_live_done = {"hearts": 0, "comments": 0, "neighbors": 0}
+_live_stats_day = {"d": ""}
+
+
+def _live_flush():
+    """휴식 들어갈 때마다: 지금까지 한 공감·댓글을 오늘 날짜에 더하고 콜라보 보드에 바로 보냄.
+    (예전엔 세션이 끝나야 보내서, 하루 넘게 도는 세션이면 보드가 비어 있었음)
+    하루에 한 번은 네이버 통계(어제 확정값)도 같이 보냄."""
+    try:
+        d = {k: max(0, stats.get(k, 0) - _live_done[k]) for k in _live_done}
+        if any(d.values()):
+            _weekly_add(d["hearts"], d["comments"], d["neighbors"])
+            for k in _live_done:
+                _live_done[k] += d[k]
+        bs = {}
+        today = time.strftime("%Y-%m-%d")
+        if _live_stats_day["d"] != today and shared_driver:
+            try:
+                bs = _fetch_blog_daily_stats(shared_driver) or {}
+                if bs:
+                    _live_stats_day["d"] = today
+            except Exception as _e:
+                glog(f"⚠️ 블로그 통계 수집 실패: {_e}", "error")
+        _push_blog_stats_to_board(bs, stats.get("hearts", 0), stats.get("comments", 0), stats.get("neighbors", 0))
+    except Exception as _e:
+        glog(f"⚠️ 중간 보드 push 실패: {_e}", "error")
+
+
 def batch_rest(batch_count, driver=None):
     """배치 단위 완료 후 긴 휴식 (5~30분 랜덤)
     휴식 중 30초마다 실제 페이지 이동으로 크롬 절전 방지.
@@ -3092,6 +3203,7 @@ def batch_rest(batch_count, driver=None):
     _rest_log.append((batch_count, round(rest_sec / 60, 1), time.strftime('%H:%M')))
     glog(f"  ☕ 배치 {batch_count}개 완료 — {rest_sec/60:.1f}분 휴식 중...", "warn")
     _tg_send(f"☕ 배치 {batch_count}개 완료 — {rest_sec/60:.1f}분 휴식 시작 (이웃추가 {stats.get('neighbors', 0)}개)")
+    _live_flush()
     deadline = time.time() + rest_sec
     last_keepalive = time.time()
     _base = f"https://m.blog.naver.com/{_my_blog_id}" if _my_blog_id else "https://m.blog.naver.com"
@@ -3493,6 +3605,14 @@ def _run_worker(cfg):
             _allow_sleep()
             return
 
+    # 시작할 때 한 번: 네이버 통계(어제 확정값) + 오늘 지금까지 활동을 콜라보 보드에 올림
+    try:
+        glog("📊 시작 전 내 블로그 현황을 보드에 올리는 중...", "info")
+        _live_stats_day["d"] = ""
+        _live_flush()
+    except Exception as _e:
+        glog(f"⚠️ 시작 전 보드 업데이트 실패: {_e}", "error")
+
     end_reason   = "정상 완료"
     error_detail = ""
     _session_retries = 0
@@ -3541,6 +3661,23 @@ def _run_worker(cfg):
                     glog(f"  ❌ 크롬 재연결 실패: {e2}", "error")
                     error_detail = f"크롬 재연결 실패: {e2}"
                     end_reason   = "오류 발생"
+            elif ("로그인" in err_str or "login" in err_str.lower()) and _session_retries < _MAX_SESSION_RETRIES:
+                # 네이버 로그인이 풀린 경우 (비밀번호 변경 등): 텔레그램으로 바로 알리고, 로그인되면 저절로 이어서 진행
+                _session_retries += 1
+                glog("  🔑 네이버 로그인이 풀렸어요 — 크롬에서 다시 로그인하면 자동으로 이어서 진행합니다", "warn")
+                _tg_send("🔑 네이버 로그인 풀림!\n서버 컴퓨터 블로그 자동화 크롬에서 네이버에 다시 로그인해 주세요.\n로그인되면 30초 안에 저절로 이어서 진행해요 (버튼 안 눌러도 됨).")
+                try:
+                    driver.switch_to.alert.accept()
+                except Exception:
+                    pass
+                try:
+                    driver.get("https://nid.naver.com/nidlogin.login")
+                except Exception:
+                    pass
+                _wait_for_login(driver)
+                if stop_event.is_set():
+                    break
+                continue
             else:
                 error_detail = err_str
                 end_reason   = "오류 발생"
