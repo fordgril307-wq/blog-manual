@@ -1390,7 +1390,7 @@ class BlogDashboard:
         api_left.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         tk.Label(api_left, text="Gemini API 키", font=F_SMALL,
                  bg="#FFFFFF", fg="#555").pack(anchor="w")
-        self.api_var = tk.StringVar(value="AQ.Ab8RN6K8NupguNFf5N7oEb_kAYR8Ru3i-awbPjIMTYUwJW710g")
+        self.api_var = tk.StringVar(value="")  # 키는 코드에 두지 않고 C:\blog\settings.json에서 불러옴
         self.api_text = tk.Entry(api_left, textvariable=self.api_var, font=("Courier", 8),
                                  show="*", bg="#F7FAF7", relief=tk.FLAT, bd=0,
                                  highlightthickness=1, highlightbackground="#D0DDD0")
@@ -1689,17 +1689,19 @@ class BlogDashboard:
                 self.tg_chat_var.set(s["tg_chat"])
             if s.get("gh_token"):
                 self.gh_token_var.set(s["gh_token"])
+            if s.get("api_key"):
+                self.api_var.set(s["api_key"])
             self._log("✅ 저장된 설정을 불러왔어요.", "dim")
         except FileNotFoundError:
             pass  # 첫 실행 — 파일 없으면 그냥 넘어감
         except Exception as e:
             self._log(f"⚠️ 설정 불러오기 실패: {e}", "dim")
 
-    def _save_settings(self, tg_token, tg_chat, gh_token):
+    def _save_settings(self, tg_token, tg_chat, gh_token, api_key=""):
         """텔레그램·GitHub 토큰 저장 (다음 실행 시 자동 채우기)"""
         import json as _json
         try:
-            s = {"tg_token": tg_token, "tg_chat": tg_chat, "gh_token": gh_token}
+            s = {"tg_token": tg_token, "tg_chat": tg_chat, "gh_token": gh_token, "api_key": api_key}
             with open(self.SETTINGS_PATH, "w", encoding="utf-8") as f:
                 _json.dump(s, f, ensure_ascii=False, indent=2)
         except Exception as e:
@@ -1810,7 +1812,7 @@ class BlogDashboard:
             prem_min = 100
         gh_token = self.gh_token_var.get().strip()
         # 토큰 저장 (다음 실행 시 자동 채우기)
-        self._save_settings(tg_token, tg_chat, gh_token)
+        self._save_settings(tg_token, tg_chat, gh_token, api_key)
 
         cfg = {"api_key": api_key, "tg_token": tg_token, "tg_chat": tg_chat,
                "gh_token": gh_token,
